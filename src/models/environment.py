@@ -9,6 +9,7 @@ class Environment:
 
         self.pits = self._make_pits()
         self.wumpus = self._make_wumpus()
+        self.gold = self._make_gold()
 
     def pit_count(self):
         return int(self.pitProb * (self.gridSize * self.gridSize - 1))
@@ -23,6 +24,12 @@ class Environment:
         cellsChoices = np.setdiff1d(cellsChoices, self.pits)
         return np.random.choice(cellsChoices, 1, replace=False)
 
+    def _make_gold(self):
+        cellsChoices = np.arange(1, self.grid.size)
+        cellsChoices = np.setdiff1d(cellsChoices, self.pits)
+        cellsChoices = np.setdiff1d(cellsChoices, self.wumpus)
+        return np.random.choice(cellsChoices, 1, replace=False)
+
     def is_pit(self, index):
         flatIndex = index[0]*self.gridSize+index[1]
         # print(flatIndex, index, self.pits)
@@ -32,6 +39,11 @@ class Environment:
         flatIndex = index[0]*self.gridSize+index[1]
         # print(flatIndex, index, self.pits)
         return flatIndex in self.wumpus
+
+    def is_gold(self, index):
+        flatIndex = index[0]*self.gridSize+index[1]
+        # print(flatIndex, index, self.pits)
+        return flatIndex in self.gold
 
     def print_grid(self, area=4):
         print(self.pits, self.wumpus)
@@ -47,6 +59,8 @@ class Environment:
                     element = 'P'
                 elif self.is_wumpus((i, j)):
                     element = 'W'
+                elif self.is_gold((i, j)):
+                    element = 'G'
                 row += f"   {element}    |"
             print(row)
         print(("+" + "- " * area) * size + "+")
