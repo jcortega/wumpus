@@ -167,6 +167,8 @@ class Environment:
                     if self._is_stench((i, j)):
                         element += 's'
                     if self.agent.location == (i, j):
+                        if self.gold_grabbed:
+                            element += 'G'
                         if self.agent.orientations[self.agent.orientation] == 'up':
                             element += u'A\u2303'
                         elif self.agent.orientations[self.agent.orientation] == 'down':
@@ -250,6 +252,7 @@ class Environment:
 
             if percepts["glitter"] and not self.gold_grabbed:
                 self.gold_grabbed = True
+                room.has_glitter = False
 
         elif action == "c":  # Climb
             room = self.grid.item(self.agent.location)
