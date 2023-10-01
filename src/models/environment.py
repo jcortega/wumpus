@@ -25,8 +25,8 @@ class Environment:
 
         self.grid = self.__init_empty_grid()
 
-        self.pits = self._make_pits()
-        for p in self.pits:
+        pits = self._make_pits()
+        for p in pits:
             self.grid.flat[p].has_pit = True
 
             left = self.left_idx(p)
@@ -45,8 +45,8 @@ class Environment:
             if top > -1:
                 self.grid.flat[top].has_breeze = True
 
-        self.wumpus = self._make_wumpus()
-        wumpus_loc = self.wumpus[0]
+        wumpus = self._make_wumpus()
+        wumpus_loc = wumpus[0]
         self.grid.flat[wumpus_loc].has_wumpus = True
 
         left = self.left_idx(wumpus_loc)
@@ -65,8 +65,8 @@ class Environment:
         if top > -1:
             self.grid.flat[top].has_stench = True
 
-        self.gold = self._make_gold()
-        self.grid.flat[self.gold[0]].has_glitter = True
+        gold = self._make_gold()
+        self.grid.flat[gold[0]].has_glitter = True
 
     def __init_empty_grid(self):
         grid = np.empty((self.gridHeight, self.gridWidth), dtype=object)
