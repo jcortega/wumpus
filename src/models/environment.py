@@ -173,6 +173,8 @@ class Environment:
                         element += 'b'
                     if self._is_stench((i, j)):
                         element += 's'
+                    if self.agent.location == (i, j):
+                        element += 'A'
                 else:
                     element += ""
                 row += ' ' * int(padding/2) + element + \
