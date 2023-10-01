@@ -9,7 +9,7 @@ orientations = ['right', 'down', 'left', 'up']
 
 class Episode:
     def __init__(self):
-        self.environment = Environment(4, 4)
+        self.environment = Environment(4, 4, debug=True)
         self.agent = Agent()
         self.environment.set_agent(self.agent)
 
@@ -31,59 +31,14 @@ class Episode:
             # print(f"Points: {self.points}")
             print(f"Observed: {percepts}")
             if self.agent.is_dead():
+                self.environment.print_grid()
                 print(
                     f"Agent is dead leaving with {self.agent.points()} points")
                 return
 
             if self.agent.exited():
+                self.environment.print_grid()
                 print(f"Agent exited with {self.agent.points()} points.")
                 return True
 
             action = input("Enter your action: ")
-
-            # grabbed_gold = percepts["grabbed_gold"]
-            # if grabbed_gold:
-            #     self.agent.grab_gold()
-
-            # # os.system('clear')
-            # self.environment.print_grid()
-
-            # self.points += percepts["points"]
-            # if percepts["agent_dead"]:
-            #     print(f"Agent is dead. Total Points: {self.points} {percepts}")
-            #     return
-
-            # if percepts["bump"]:
-            #     self.loc = tuple(list(self.oldloc))
-
-            # orientation = orientations[self.orientation_idx]
-
-            # print(f"Current loc: {self.loc}")
-            # print(f"facing: {orientation}")
-            # print(f"Points: {self.points}")
-            # print(f"Observed: {percepts}")
-            # action = input("Enter your action: ")
-
-            # if action == 'f':
-            #     self.oldloc = tuple(list(self.loc))
-
-            #     if (orientation == 'right'):
-            #         self.loc = (self.loc[0], self.loc[1]+1)
-            #     elif (orientation == 'left'):
-            #         self.loc = (self.loc[0], self.loc[1]-1)
-            #     elif (orientation == 'up'):
-            #         self.loc = (self.loc[0]+1, self.loc[1])
-            #     elif (orientation == 'down'):
-            #         self.loc = (self.loc[0]-1, self.loc[1])
-            # elif action == 'l':
-            #     self.orientation_idx = (
-            #         self.orientation_idx-1) % len(orientations)
-            # elif action == 'r':
-            #     self.orientation_idx = (
-            #         self.orientation_idx+1) % len(orientations)
-            # elif action == 'g':
-            #     pass
-            # elif action == 's':
-            #     pass
-            # else:
-            #     print("Unrecognized action")

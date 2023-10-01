@@ -6,12 +6,14 @@ from .room import Room
 
 
 class Environment:
-    def __init__(self, width=4, height=4, allowClimbWithoutGold=False, pitProb=0.2):
+    def __init__(self, width=4, height=4, allowClimbWithoutGold=False, pitProb=0.2, debug=False):
         self.Agent = None
         self.gridHeight = height
         self.gridWidth = width
         self.allowClimbWithoutGold = allowClimbWithoutGold
         self.pitProb = pitProb
+
+        self._debug = debug
 
         # self.points = {
         #     'f': -1,
@@ -160,19 +162,19 @@ class Environment:
             for j in range(self.gridWidth):
                 # item = self.grid.item((i, j))
                 element = ''
-                # if (self.grid.item(i, j).visited):
-                if self._is_pit((i, j)):
-                    element += 'P'
-                if self._is_wumpus((i, j)):
-                    element += 'W'
-                if self._is_gold((i, j)):
-                    element += 'G'
-                if self._is_breeze((i, j)):
-                    element += 'b'
-                if self._is_stench((i, j)):
-                    element += 's'
-                # else:
-                #     element += ""
+                if (self.grid.item(i, j).visited) or self._debug:
+                    if self._is_pit((i, j)):
+                        element += 'P'
+                    if self._is_wumpus((i, j)):
+                        element += 'W'
+                    if self._is_gold((i, j)):
+                        element += 'G'
+                    if self._is_breeze((i, j)):
+                        element += 'b'
+                    if self._is_stench((i, j)):
+                        element += 's'
+                else:
+                    element += ""
                 row += ' ' * int(padding/2) + element + \
                     ' ' * (int(padding/2)-len(element)) + "|"
             print(row)
