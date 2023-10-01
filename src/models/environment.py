@@ -199,6 +199,7 @@ class Environment:
                 percepts["scream"] = self.wumpus_dead
                 percepts["points"] = -1
             else:
+                # New location
                 self.agent.set_location(newloc)
                 room = self.grid.item(newloc)
                 percepts["stench"] = room.has_stench
@@ -208,9 +209,11 @@ class Environment:
                 percepts["scream"] = self.wumpus_dead
                 percepts["points"] = -1
 
-                room.visited = True
+                if room.has_wumpus or room.has_pit:
+                    percepts["points"] += -1000
+                    self.agent.kill()
 
-            return percepts
+                room.visited = True
 
         elif action == "l":  # turn left
             self.agent.turn_left()
@@ -257,6 +260,8 @@ class Environment:
             percepts["bump"] = False
             percepts["scream"] = self.wumpus_dead
             percepts["points"] = 0
+
+        self.agent.increment_points(percepts["points"])
 
         return percepts
 

@@ -23,13 +23,22 @@ class Episode:
         print("Running episode...")
 
         action = None
-        while not self.agent.is_dead() or not self.agent.exited():
+        while True:
             self.environment.print_grid()
             percepts = self.environment.get_percepts(action)
             print(f"Current loc: {self.agent.location}")
             print(f"facing: {self.agent.orientations[self.agent.orientation]}")
             # print(f"Points: {self.points}")
             print(f"Observed: {percepts}")
+            if self.agent.is_dead():
+                print(
+                    f"Agent is dead leaving with {self.agent.points()} points")
+                return
+
+            if self.agent.exited():
+                print(f"Agent exited with {self.agent.points()} points.")
+                return True
+
             action = input("Enter your action: ")
 
             # grabbed_gold = percepts["grabbed_gold"]

@@ -3,9 +3,10 @@ class Agent:
     points = 0
     orientations = ['right', 'down', 'left', 'up']
     orientation = 0
+    _points = 0
 
-    is_dead = False
-    exited = False
+    _is_dead = False
+    _exited = False
     has_gold = False
 
     def grab_gold(self):
@@ -22,8 +23,20 @@ class Agent:
         self.orientation = (
             self.orientation+1) % len(self.orientation)
 
+    def exited(self):
+        return self._exited
+
     def exit(self):
         self.exited = True
 
+    def kill(self):
+        self._is_dead = True
+
     def is_dead(self):
-        self.dead = True
+        return self._is_dead
+
+    def increment_points(self, points):
+        self._points += points
+
+    def points(self):
+        return self._points
