@@ -145,6 +145,46 @@ class Environment:
         return location[0] >= self.gridHeight or location[0] < 0 or \
             location[1] >= self.gridWidth or location[1] < 0
 
+    def _shoot_wumpus(self, from_loc, direction):
+        if self.agent.arrows <= 0:
+            print("No more arrows...")
+            return False
+
+        self.agent.arrows -= 1
+        if direction == 'left':
+            for n in reversed(range(0, from_loc[1])):
+                room = self.grid.item((from_loc[0], n))
+                if room.has_wumpus:
+                    self.wumpus_dead = True
+                    self.room_has_humpus = False
+                    return True
+
+        elif direction == 'right':
+            for n in range(from_loc[1], self.gridWidth):
+                room = self.grid.item((from_loc[0], n))
+                if room.has_wumpus:
+                    self.wumpus_dead = True
+                    self.room_has_humpus = False
+                    return True
+
+        elif direction == 'up':
+            for n in range(from_loc[0], self.gridHeight):
+                room = self.grid.item((n, from_loc[1]))
+                if room.has_wumpus:
+                    self.wumpus_dead = True
+                    self.room_has_humpus = False
+                    return True
+
+        elif direction == 'down':
+            for n in reversed(range(from_loc[0], self.gridHeight)):
+                room = self.grid.item((n, from_loc[1]))
+                if room.has_wumpus:
+                    self.wumpus_dead = True
+                    self.room_has_humpus = False
+                    return True
+
+        return False
+
     def print_grid(self):
         # Reverse range so 0,0 is at the bottom
         print("\n")
@@ -215,7 +255,11 @@ class Environment:
                 percepts["scream"] = self.wumpus_dead
                 percepts["points"] = -1
 
-                if room.has_wumpus or room.has_pit:
+                if room.has_pit:
+                    percepts["points"] += -1000
+                    self.agent.kill()
+
+                if room.has_wumpus and not self.wumpus_dead:
                     percepts["points"] += -1000
                     self.agent.kill()
 
@@ -274,6 +318,21 @@ class Environment:
                         # Not allowed to exit
                         print("Not allowed to exit without gold..")
                         pass
+
+        elif action == "s":  # Shoot
+            room = self.grid.item(self.agent.location)
+            direction = self.agent.orientations[self.agent.orientation]
+            wumpus_shot = self._shoot_wumpus(self.agent.location, direction)
+
+            percepts["stench"] = room.has_stench
+            percepts["breeze"] = room.has_breeze
+            percepts["glitter"] = room.has_glitter
+            percepts["bump"] = False
+            percepts["scream"] = self.wumpus_dead
+            percepts["points"] = -1
+
+            if wumpus_shot:
+                percepts["points"] += 10
 
         else:
             room = self.grid.item(self.agent.location)

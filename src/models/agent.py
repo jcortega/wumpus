@@ -7,6 +7,8 @@ class Agent:
 
     _is_dead = False
     _exited = False
+
+    arrows = 1
     # has_gold = False
 
     # def grab_gold(self):
