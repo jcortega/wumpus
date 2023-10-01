@@ -6,6 +6,7 @@ class Room:
     has_breeze = False
     has_glitter = False
     has_wumpus = False
+    has_pit = False
 
     def __init__(self, has_stench=False, has_breeze=False, has_glitter=False, has_wumpus=False, has_pit=False):
         self.has_stench = has_stench
@@ -13,9 +14,6 @@ class Room:
         self.has_glitter = has_glitter
         self.has_wumpus = has_wumpus
         self.has_pit = has_pit
-
-    def put_wumpus(self):
-        self.has_wumpus = True
 
 
 class Environment:
@@ -25,80 +23,57 @@ class Environment:
 
         self.pitProb = 0.2
 
-        self.grid = np.empty((self.gridHeight, self.gridWidth), dtype=object)
-        print(self.grid.shape)
-        self.emptyRoom = Room()
-        self.grid.fill(self.emptyRoom)
+        self.grid = self.__init_empty_grid()
 
         self.pits = self._make_pits()
         for p in self.pits:
-            self.grid.flat[p] = Room(has_pit=True)
+            self.grid.flat[p].has_pit = True
 
             left = self.left_idx(p)
             if left > -1:
-                self.set_breeze(left)
+                self.grid.flat[left].has_breeze = True
 
             right = self.right_idx(p)
             if right > -1:
-                self.set_breeze(right)
+                self.grid.flat[right].has_breeze = True
 
             bottom = self.bottom_idx(p)
             if bottom > -1:
-                self.set_breeze(bottom)
+                self.grid.flat[bottom].has_breeze = True
 
             top = self.top_idx(p)
             if top > -1:
-                self.set_breeze(top)
+                self.grid.flat[top].has_breeze = True
 
         self.wumpus = self._make_wumpus()
         wumpus_loc = self.wumpus[0]
-        self.set_wumpus(wumpus_loc)
+        self.grid.flat[wumpus_loc].has_wumpus = True
+
         left = self.left_idx(wumpus_loc)
         if left > -1:
-            self.set_stench(left)
+            self.grid.flat[left].has_stench = True
 
         right = self.right_idx(wumpus_loc)
         if right > -1:
-            self.set_stench(right)
+            self.grid.flat[right].has_stench = True
 
         bottom = self.bottom_idx(wumpus_loc)
         if bottom > -1:
-            self.set_stench(bottom)
+            self.grid.flat[bottom].has_stench = True
 
         top = self.top_idx(wumpus_loc)
         if top > -1:
-            self.set_stench(top)
+            self.grid.flat[top].has_stench = True
 
         self.gold = self._make_gold()
-        self.set_gold(self.gold[0])
+        self.grid.flat[self.gold[0]].has_glitter = True
 
-    def set_wumpus(self, index):
-        if (self.grid.flat[index] == self.emptyRoom):
-            self.grid.flat[index] = Room(has_wumpus=True)
-        else:
-            self.grid.flat[index].has_wumpus = True
-
-    def set_gold(self, index):
-        if (self.grid.flat[index] == self.emptyRoom):
-            self.grid.flat[index] = Room(has_glitter=True)
-        else:
-            self.grid.flat[index].has_glitter = True
-
-    def set_breeze(self, index):
-        if self.grid.flat[index] == self.emptyRoom:
-            # create new room
-            self.grid.flat[index] = Room(has_breeze=True)
-        else:
-            # update room element
-            self.grid.flat[index].has_breeze = True
-
-    def set_stench(self, index):
-        if self.grid.flat[index] == self.emptyRoom:
-            # create new room
-            self.grid.flat[index] = Room(has_stench=True)
-        else:
-            # update room element
-            self.grid.flat[index].has_stench = True
+    def __init_empty_grid(self):
+        grid = np.empty((self.gridHeight, self.gridWidth), dtype=object)
+        for i in range(0, self.gridHeight):
+            for j in range(0, self.gridWidth):
+                grid[i, j] = Room()
+        return grid
 
     def right_idx(self, index):
         # returns flat index next to index if exists
@@ -166,9 +141,8 @@ class Environment:
         return self.grid.item(index).has_stench
 
     def print_grid(self):
-        print(self.pits, self.wumpus)
-        print(self.grid)
         # Reverse range so 0,0 is at the bottom
+        print("\n")
         for i in reversed(range(self.gridHeight)):
             padding = 8
             print(("+" + "-" * padding) * self.gridWidth + "+")
@@ -183,10 +157,10 @@ class Environment:
                 if self.is_gold((i, j)):
                     element += 'G'
                 if self.is_breeze((i, j)):
-                    element += 'B'
+                    element += 'b'
                 if self.is_stench((i, j)):
-                    element += 'S'
+                    element += 's'
                 row += ' ' * int(padding/2) + element + \
                     ' ' * (int(padding/2)-len(element)) + "|"
             print(row)
-        print(("+" + "--------") * self.gridWidth + "+")
+        print(("+" + "-" * padding) * self.gridWidth + "+")
