@@ -25,8 +25,8 @@ class Episode:
 
         action = None
         while True:
-            self.environment.print_grid()
             percepts = self.environment.get_percepts(action)
+            self.environment.print_grid()
             if self.debug:
                 print(f"Current loc: {self.agent.location}")
                 print(

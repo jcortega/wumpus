@@ -167,7 +167,14 @@ class Environment:
                     if self._is_stench((i, j)):
                         element += 's'
                     if self.agent.location == (i, j):
-                        element += 'A'
+                        if self.agent.orientations[self.agent.orientation] == 'up':
+                            element += u'A\u2303'
+                        elif self.agent.orientations[self.agent.orientation] == 'down':
+                            element += u'A\u2304'
+                        elif self.agent.orientations[self.agent.orientation] == 'left':
+                            element += u'A\u2039'
+                        elif self.agent.orientations[self.agent.orientation] == 'right':
+                            element += u'A\u203A'
                 else:
                     element += ""
                 row += ' ' * int(padding/2) + element + \
