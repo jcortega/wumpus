@@ -113,7 +113,6 @@ class Environment:
     def _draw_room(self, count, exclude=[]):
         choices = np.arange(1, self.grid.size)
         choices = np.setdiff1d(choices, exclude)
-        print(exclude, choices)
         return np.random.choice(choices, count, replace=False)
 
     def _is_pit(self, index):
@@ -346,24 +345,3 @@ class Environment:
         self.agent.increment_points(percepts["points"])
 
         return percepts
-
-        # agent_dead = False
-        # agent_exited = True
-
-        # points = self.points.get(action, 0)
-
-        # if room.has_wumpus or room.has_pit:
-        #     points += -1000
-        #     agent_dead = True
-
-        # grabbed_gold = False
-        # if room.has_glitter and action == 'g':
-        #     grabbed_gold = True
-
-        # if action == 'c':
-        #     if grabbed_gold = True
-        #     if self.allowClimbWithoutGold:
-        #         if newloc == (0, 0):
-        #             agent_exited = True
-        #     else:
-        #         points += 1000
