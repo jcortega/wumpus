@@ -139,16 +139,19 @@ class Environment:
             for j in range(self.gridWidth):
                 # item = self.grid.item((i, j))
                 element = ''
-                if self.is_pit((i, j)):
-                    element += 'P'
-                if self.is_wumpus((i, j)):
-                    element += 'W'
-                if self.is_gold((i, j)):
-                    element += 'G'
-                if self.is_breeze((i, j)):
-                    element += 'b'
-                if self.is_stench((i, j)):
-                    element += 's'
+                if (self.grid.item(i, j).visited):
+                    if self.is_pit((i, j)):
+                        element += 'P'
+                    if self.is_wumpus((i, j)):
+                        element += 'W'
+                    if self.is_gold((i, j)):
+                        element += 'G'
+                    if self.is_breeze((i, j)):
+                        element += 'b'
+                    if self.is_stench((i, j)):
+                        element += 's'
+                else:
+                    element += ""
                 row += ' ' * int(padding/2) + element + \
                     ' ' * (int(padding/2)-len(element)) + "|"
             print(row)
@@ -162,6 +165,8 @@ class Environment:
             room = self.grid.item(curloc)
         else:
             room = self.grid.item(newloc)
+
+        room.visited = True
 
         scream = False
 

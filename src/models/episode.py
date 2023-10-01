@@ -18,12 +18,14 @@ class Episode:
 
     def run(self):
         print("Running episode...")
-        self.environment.print_grid()
 
         action = None
         while True:
             percepts = self.environment.get_percepts(
                 self.oldloc, self.loc, action)
+
+            self.environment.print_grid()
+
             self.points += percepts["points"]
             if percepts["agent_dead"]:
                 print(f"Agent is dead. Total Points: {self.points}")
