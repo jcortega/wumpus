@@ -25,7 +25,7 @@ class Environment:
 
         self.grid = self.__init_empty_grid()
 
-        pits = self._make_pits()
+        pits = self._draw_room(self.pit_count(), [])
         for p in pits:
             self.grid.flat[p].has_pit = True
 
@@ -45,7 +45,7 @@ class Environment:
             if top > -1:
                 self.grid.flat[top].has_breeze = True
 
-        wumpus = self._make_wumpus()
+        wumpus = self._draw_room(1, pits)
         wumpus_loc = wumpus[0]
         self.grid.flat[wumpus_loc].has_wumpus = True
 
@@ -65,7 +65,8 @@ class Environment:
         if top > -1:
             self.grid.flat[top].has_stench = True
 
-        gold = self._make_gold()
+        gold = self._draw_room(1, pits + wumpus)
+
         self.grid.flat[gold[0]].has_glitter = True
 
     def __init_empty_grid(self):
@@ -109,21 +110,10 @@ class Environment:
     def pit_count(self):
         return int(self.pitProb * (self.gridHeight * self.gridWidth - 1))
 
-    def _make_pits(self):
-        cellsChoices = np.arange(1, self.grid.size)
-        pitCount = self.pit_count()
-        return np.random.choice(cellsChoices, pitCount, replace=False)
-
-    def _make_wumpus(self):
-        cellsChoices = np.arange(1, self.grid.size)
-        cellsChoices = np.setdiff1d(cellsChoices, self.pits)
-        return np.random.choice(cellsChoices, 1, replace=False)
-
-    def _make_gold(self):
-        cellsChoices = np.arange(1, self.grid.size)
-        cellsChoices = np.setdiff1d(cellsChoices, self.pits)
-        cellsChoices = np.setdiff1d(cellsChoices, self.wumpus)
-        return np.random.choice(cellsChoices, 1, replace=False)
+    def _draw_room(self, count, exclude=[]):
+        choices = np.arange(1, self.grid.size)
+        choices = np.setdiff1d(choices, exclude)
+        return np.random.choice(choices, count, replace=False)
 
     def is_pit(self, index):
         return self.grid.item(index).has_pit
