@@ -15,17 +15,8 @@ class Environment:
 
         self._debug = debug
 
-        # self.points = {
-        #     'f': -1,
-        #     'l': -1,
-        #     'r': -1,
-        #     # 'g': 1000,  # TODO: wait til climb ,
-        #     # 'w': -1000,
-        #     # 'p': -1000,
-        #     None: 0
-        # }
-
         self.wumpus_dead = False
+        self.gold_grabbed = False
 
         self.__set_environment()
 
@@ -247,6 +238,9 @@ class Environment:
             percepts["bump"] = False
             percepts["scream"] = self.wumpus_dead
             percepts["points"] = -1
+
+            if percepts["glitter"] and not self.gold_grabbed:
+                self.gold_grabbed = True
 
         elif action == "c":  # Climb
             room = self.grid.item(self.agent.location)

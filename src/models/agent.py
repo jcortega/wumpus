@@ -7,10 +7,10 @@ class Agent:
 
     _is_dead = False
     _exited = False
-    has_gold = False
+    # has_gold = False
 
-    def grab_gold(self):
-        self.has_gold = True
+    # def grab_gold(self):
+    #     self.has_gold = True
 
     def set_location(self, location):
         self.location = location
