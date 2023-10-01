@@ -1,25 +1,35 @@
 import numpy as np
 
+from .agent import Agent
+
 from .room import Room
 
 
 class Environment:
-    def __init__(self, width=4, height=4):
+    def __init__(self, width=4, height=4, allowClimbWithoutGold=False, pitProb=0.2, debug=False):
+        self.Agent = None
         self.gridHeight = height
         self.gridWidth = width
+        self.allowClimbWithoutGold = allowClimbWithoutGold
+        self.pitProb = pitProb
 
-        self.pitProb = 0.2
+        self._debug = debug
 
-        self.points = {
-            'f': -1,
-            'l': -1,
-            'r': -1,
-            'g': 1000,  # TODO: wait til climb ,
-            # 'w': -1000,
-            # 'p': -1000,
-            None: 0
-        }
+        # self.points = {
+        #     'f': -1,
+        #     'l': -1,
+        #     'r': -1,
+        #     # 'g': 1000,  # TODO: wait til climb ,
+        #     # 'w': -1000,
+        #     # 'p': -1000,
+        #     None: 0
+        # }
 
+        self.wumpus_dead = False
+
+        self.__set_environment()
+
+    def __set_environment(self):
         self.grid = self.__init_empty_grid()
 
         pits = self._draw_room(self.pit_count(), [])
@@ -42,7 +52,6 @@ class Environment:
             if top > -1:
                 self.grid.flat[top].has_breeze = True
 
-        # FIXME: Not properly excluding pits
         wumpus = self._draw_room(1, pits)
         wumpus_loc = wumpus[0]
         self.grid.flat[wumpus_loc].has_wumpus = True
@@ -63,8 +72,7 @@ class Environment:
         if top > -1:
             self.grid.flat[top].has_stench = True
 
-        # FIXME: Not properly excluding pits + wumpus
-        gold = self._draw_room(1, pits + wumpus)
+        gold = self._draw_room(1, np.append(pits, wumpus))
 
         self.grid.flat[gold[0]].has_glitter = True
 
@@ -112,22 +120,37 @@ class Environment:
     def _draw_room(self, count, exclude=[]):
         choices = np.arange(1, self.grid.size)
         choices = np.setdiff1d(choices, exclude)
+        print(exclude, choices)
         return np.random.choice(choices, count, replace=False)
 
-    def is_pit(self, index):
+    def _is_pit(self, index):
         return self.grid.item(index).has_pit
 
-    def is_wumpus(self, index):
+    def _is_wumpus(self, index):
         return self.grid.item(index).has_wumpus
 
-    def is_gold(self, index):
+    def _is_gold(self, index):
         return self.grid.item(index).has_glitter
 
-    def is_breeze(self, index):
+    def _is_breeze(self, index):
         return self.grid.item(index).has_breeze
 
-    def is_stench(self, index):
+    def _is_stench(self, index):
         return self.grid.item(index).has_stench
+
+    def _get_next_loc(self, location, orientation):
+        if (orientation == 0):  # Right
+            return (location[0], location[1]+1)
+        elif (orientation == 2):  # left
+            return (location[0], location[1]-1)
+        elif (orientation == 3):  # right
+            return (location[0]+1, location[1])
+        elif (orientation == 1):  # down
+            return (location[0]-1, location[1])
+
+    def _will_hit_wall(self, location):
+        return location[0] >= self.gridHeight or location[0] < 0 or \
+            location[1] >= self.gridWidth or location[1] < 0
 
     def print_grid(self):
         # Reverse range so 0,0 is at the bottom
@@ -139,17 +162,19 @@ class Environment:
             for j in range(self.gridWidth):
                 # item = self.grid.item((i, j))
                 element = ''
-                if (self.grid.item(i, j).visited):
-                    if self.is_pit((i, j)):
+                if (self.grid.item(i, j).visited) or self._debug:
+                    if self._is_pit((i, j)):
                         element += 'P'
-                    if self.is_wumpus((i, j)):
+                    if self._is_wumpus((i, j)):
                         element += 'W'
-                    if self.is_gold((i, j)):
+                    if self._is_gold((i, j)):
                         element += 'G'
-                    if self.is_breeze((i, j)):
+                    if self._is_breeze((i, j)):
                         element += 'b'
-                    if self.is_stench((i, j)):
+                    if self._is_stench((i, j)):
                         element += 's'
+                    if self.agent.location == (i, j):
+                        element += 'A'
                 else:
                     element += ""
                 row += ' ' * int(padding/2) + element + \
@@ -157,34 +182,110 @@ class Environment:
             print(row)
         print(("+" + "-" * padding) * self.gridWidth + "+")
 
-    def get_percepts(self, curloc: (int, int), newloc: (int, int), action=None):
-        bump = newloc[0] >= self.gridHeight or newloc[0] < 0
-        bump = bump or newloc[1] >= self.gridWidth or newloc[1] < 0
+    def set_agent(self, agent: Agent):
+        self.agent = agent
+        self.agent.orientation = 0
+        self.agent.location = (0, 0)
 
-        if (bump):
-            room = self.grid.item(curloc)
+    def get_percepts(self, action=None):
+        percepts = {}
+        if action == "f":  # forward
+            newloc = self._get_next_loc(
+                self.agent.location, self.agent.orientation)
+            if self._will_hit_wall(newloc):
+                # Redundant but just to make sure it's not changed
+                self.agent.set_location(self.agent.location)
+                room = self.grid.item(self.agent.location)
+                percepts["stench"] = room.has_stench
+                percepts["breeze"] = room.has_breeze
+                percepts["glitter"] = room.has_glitter
+                percepts["bump"] = True
+                percepts["scream"] = self.wumpus_dead
+                percepts["points"] = -1
+            else:
+                # New location
+                self.agent.set_location(newloc)
+                room = self.grid.item(newloc)
+                percepts["stench"] = room.has_stench
+                percepts["breeze"] = room.has_breeze
+                percepts["glitter"] = room.has_glitter
+                percepts["bump"] = False
+                percepts["scream"] = self.wumpus_dead
+                percepts["points"] = -1
+
+                if room.has_wumpus or room.has_pit:
+                    percepts["points"] += -1000
+                    self.agent.kill()
+
+                room.visited = True
+
+        elif action == "l":  # turn left
+            self.agent.turn_left()
+            room = self.grid.item(self.agent.location)
+            percepts["stench"] = room.has_stench
+            percepts["breeze"] = room.has_breeze
+            percepts["glitter"] = room.has_glitter
+            percepts["bump"] = False
+            percepts["scream"] = self.wumpus_dead
+            percepts["points"] = -1
+
+        elif action == "r":  # turn right
+            self.agent.turn_right()
+            room = self.grid.item(self.agent.location)
+            percepts["stench"] = room.has_stench
+            percepts["breeze"] = room.has_breeze
+            percepts["glitter"] = room.has_glitter
+            percepts["bump"] = False
+            percepts["scream"] = self.wumpus_dead
+            percepts["points"] = -1
+
+        elif action == "g":  # grab gold
+            room = self.grid.item(self.agent.location)
+            percepts["stench"] = room.has_stench
+            percepts["breeze"] = room.has_breeze
+            percepts["glitter"] = room.has_glitter
+            percepts["bump"] = False
+            percepts["scream"] = self.wumpus_dead
+            percepts["points"] = -1
+
+        elif action == "c":  # Climb
+            room = self.grid.item(self.agent.location)
+            percepts["stench"] = room.has_stench
+            percepts["breeze"] = room.has_breeze
+            percepts["glitter"] = room.has_glitter
+            percepts["bump"] = False
+            percepts["scream"] = self.wumpus_dead
+            percepts["points"] = -1
         else:
-            room = self.grid.item(newloc)
+            room = self.grid.item(self.agent.location)
+            percepts["stench"] = room.has_stench
+            percepts["breeze"] = room.has_breeze
+            percepts["glitter"] = room.has_glitter
+            percepts["bump"] = False
+            percepts["scream"] = self.wumpus_dead
+            percepts["points"] = 0
 
-        room.visited = True
+        self.agent.increment_points(percepts["points"])
 
-        scream = False
+        return percepts
 
-        points = self.points[action]
+        # agent_dead = False
+        # agent_exited = True
 
-        agent_dead = False
+        # points = self.points.get(action, 0)
 
-        if room.has_wumpus or room.has_pit:
-            points -= 1000
-            agent_dead = True
+        # if room.has_wumpus or room.has_pit:
+        #     points += -1000
+        #     agent_dead = True
 
-        if room.has_glitter:
-            points += 1000
+        # grabbed_gold = False
+        # if room.has_glitter and action == 'g':
+        #     grabbed_gold = True
 
-        return {"stench": room.has_stench,
-                "breeze": room.has_breeze,
-                "glitter": room.has_glitter,
-                "bump": bump,
-                "scream": scream,
-                "points": points,
-                "agent_dead": agent_dead}
+        # if action == 'c':
+        #     if grabbed_gold = True
+        #     if self.allowClimbWithoutGold:
+        #         if newloc == (0, 0):
+        #             agent_exited = True
+        #     else:
+        #         points += 1000
