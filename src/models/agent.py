@@ -21,7 +21,7 @@ class Agent:
 
     def turn_right(self):
         self.orientation = (
-            self.orientation+1) % len(self.orientation)
+            self.orientation+1) % len(self.orientations)
 
     def exited(self):
         return self._exited
