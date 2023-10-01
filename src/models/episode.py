@@ -8,8 +8,9 @@ orientations = ['right', 'down', 'left', 'up']
 
 
 class Episode:
-    def __init__(self):
-        self.environment = Environment(4, 4, debug=True)
+    def __init__(self, debug):
+        self.debug = debug
+        self.environment = Environment(4, 4, debug=debug)
         self.agent = Agent()
         self.environment.set_agent(self.agent)
 
@@ -26,14 +27,16 @@ class Episode:
         while True:
             self.environment.print_grid()
             percepts = self.environment.get_percepts(action)
-            print(f"Current loc: {self.agent.location}")
-            print(f"facing: {self.agent.orientations[self.agent.orientation]}")
-            # print(f"Points: {self.points}")
-            print(f"Observed: {percepts}")
+            if self.debug:
+                print(f"Current loc: {self.agent.location}")
+                print(
+                    f"facing: {self.agent.orientations[self.agent.orientation]}")
+                print(f"Points: {self.agent.points()}")
+                print(f"Observed: {percepts}")
             if self.agent.is_dead():
                 self.environment.print_grid()
                 print(
-                    f"Agent is dead leaving with {self.agent.points()} points")
+                    f"Agent died leaving with {self.agent.points()} points")
                 return
 
             if self.agent.exited():

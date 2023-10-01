@@ -67,6 +67,8 @@ class Environment:
 
         self.grid.flat[gold[0]].has_glitter = True
 
+        self.grid[0, 0].visited = True
+
     def __init_empty_grid(self):
         grid = np.empty((self.gridHeight, self.gridWidth), dtype=object)
         for i in range(0, self.gridHeight):
@@ -250,6 +252,19 @@ class Environment:
             percepts["bump"] = False
             percepts["scream"] = self.wumpus_dead
             percepts["points"] = -1
+
+            if self.agent.location == (0, 0):
+                if self.allowClimbWithoutGold:
+                    self.agent.exit()
+                else:
+                    if self.gold_grabbed:
+                        percepts["points"] = 1000
+                        self.agent.exit()
+                    else:
+                        # Not allowed to exit
+                        print("Not allowed to exit without gold..")
+                        pass
+
         else:
             room = self.grid.item(self.agent.location)
             percepts["stench"] = room.has_stench
