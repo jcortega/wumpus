@@ -27,7 +27,7 @@ class Agent:
         return self._exited
 
     def exit(self):
-        self.exited = True
+        self._exited = True
 
     def kill(self):
         self._is_dead = True
