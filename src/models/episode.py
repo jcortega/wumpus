@@ -11,7 +11,7 @@ orientations = ['right', 'down', 'left', 'up']
 class Episode:
     def __init__(self, debug):
         self.debug = debug
-        self.environment = Environment(4, 4, False, 0, debug=debug)
+        self.environment = Environment(4, 4, False, 0.2, debug=debug)
         self.agent = Agent()
         self.environment.set_agent(self.agent)
 
