@@ -1,19 +1,6 @@
 import numpy as np
 
-
-class Room:
-    has_stench = False
-    has_breeze = False
-    has_glitter = False
-    has_wumpus = False
-    has_pit = False
-
-    def __init__(self, has_stench=False, has_breeze=False, has_glitter=False, has_wumpus=False, has_pit=False):
-        self.has_stench = has_stench
-        self.has_breeze = has_breeze
-        self.has_glitter = has_glitter
-        self.has_wumpus = has_wumpus
-        self.has_pit = has_pit
+from .room import Room
 
 
 class Environment:
@@ -22,6 +9,16 @@ class Environment:
         self.gridWidth = width
 
         self.pitProb = 0.2
+
+        self.points = {
+            'f': -1,
+            'l': -1,
+            'r': -1,
+            'g': 1000,  # TODO: wait til climb ,
+            # 'w': -1000,
+            # 'p': -1000,
+            None: 0
+        }
 
         self.grid = self.__init_empty_grid()
 
@@ -45,6 +42,7 @@ class Environment:
             if top > -1:
                 self.grid.flat[top].has_breeze = True
 
+        # FIXME: Not properly excluding pits
         wumpus = self._draw_room(1, pits)
         wumpus_loc = wumpus[0]
         self.grid.flat[wumpus_loc].has_wumpus = True
@@ -65,6 +63,7 @@ class Environment:
         if top > -1:
             self.grid.flat[top].has_stench = True
 
+        # FIXME: Not properly excluding pits + wumpus
         gold = self._draw_room(1, pits + wumpus)
 
         self.grid.flat[gold[0]].has_glitter = True
@@ -154,3 +153,33 @@ class Environment:
                     ' ' * (int(padding/2)-len(element)) + "|"
             print(row)
         print(("+" + "-" * padding) * self.gridWidth + "+")
+
+    def get_percepts(self, curloc: (int, int), newloc: (int, int), action=None):
+        bump = newloc[0] >= self.gridHeight or newloc[0] < 0
+        bump = bump or newloc[1] >= self.gridWidth or newloc[1] < 0
+
+        if (bump):
+            room = self.grid.item(curloc)
+        else:
+            room = self.grid.item(newloc)
+
+        scream = False
+
+        points = self.points[action]
+
+        agent_dead = False
+
+        if room.has_wumpus or room.has_pit:
+            points -= 1000
+            agent_dead = True
+
+        if room.has_glitter:
+            points += 1000
+
+        return {"stench": room.has_stench,
+                "breeze": room.has_breeze,
+                "glitter": room.has_glitter,
+                "bump": bump,
+                "scream": scream,
+                "points": points,
+                "agent_dead": agent_dead}

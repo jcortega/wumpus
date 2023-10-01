@@ -1,6 +1,6 @@
 import unittest
 
-from environment import Environment
+from .environment import Environment
 
 
 class TestSquareEnvironment(unittest.TestCase):
