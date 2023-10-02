@@ -321,17 +321,14 @@ class Environment:
         elif action == "s":  # Shoot
             room = self.grid.item(self.agent.location)
             direction = self.agent.orientations[self.agent.orientation]
-            wumpus_shot = self._shoot_wumpus(self.agent.location, direction)
+            self._shoot_wumpus(self.agent.location, direction)
 
             percepts["stench"] = room.has_stench
             percepts["breeze"] = room.has_breeze
             percepts["glitter"] = room.has_glitter
             percepts["bump"] = False
             percepts["scream"] = self.wumpus_dead
-            percepts["points"] = -1
-
-            if wumpus_shot:
-                percepts["points"] += 10
+            percepts["points"] = -10
 
         else:
             room = self.grid.item(self.agent.location)
