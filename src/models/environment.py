@@ -1,13 +1,13 @@
 import numpy as np
 
-from .agent import Agent
+from .agent_state import AgentState
 
 from .room import Room
 
 
 class Environment:
     def __init__(self, width=4, height=4, allowClimbWithoutGold=False, pitProb=0.2, debug=False):
-        self.Agent = None
+        self.agent_state = None
         self.gridHeight = height
         self.gridWidth = width
         self.allowClimbWithoutGold = allowClimbWithoutGold
@@ -19,6 +19,7 @@ class Environment:
         self.gold_grabbed = False
 
         self.__set_environment()
+        self.__init_agent_state()
 
     def __set_environment(self):
         self.grid = self.__init_empty_grid()
@@ -145,11 +146,11 @@ class Environment:
             location[1] >= self.gridWidth or location[1] < 0
 
     def _shoot_wumpus(self, from_loc, direction):
-        if self.agent.arrows <= 0:
+        if self.agent_state.arrows <= 0:
             print("No more arrows...")
             return False
 
-        self.agent.arrows -= 1
+        self.agent_state.arrows -= 1
         if direction == 'left':
             for n in reversed(range(0, from_loc[1])):
                 room = self.grid.item((from_loc[0], n))
@@ -205,16 +206,16 @@ class Environment:
                         element += 'b'
                     if self._is_stench((i, j)):
                         element += 's'
-                    if self.agent.location == (i, j):
+                    if self.agent_state.location == (i, j):
                         if self.gold_grabbed:
                             element += 'G'
-                        if self.agent.orientations[self.agent.orientation] == 'up':
+                        if self.agent_state.orientations[self.agent_state.orientation] == 'up':
                             element += u'A\u2303'
-                        elif self.agent.orientations[self.agent.orientation] == 'down':
+                        elif self.agent_state.orientations[self.agent_state.orientation] == 'down':
                             element += u'A\u2304'
-                        elif self.agent.orientations[self.agent.orientation] == 'left':
+                        elif self.agent_state.orientations[self.agent_state.orientation] == 'left':
                             element += u'A\u2039'
-                        elif self.agent.orientations[self.agent.orientation] == 'right':
+                        elif self.agent_state.orientations[self.agent_state.orientation] == 'right':
                             element += u'A\u203A'
                 else:
                     element += ""
@@ -223,20 +224,21 @@ class Environment:
             print(row)
         print(("+" + "-" * padding) * self.gridWidth + "+")
 
-    def set_agent(self, agent: Agent):
-        self.agent = agent
-        self.agent.orientation = 0
-        self.agent.location = (0, 0)
+    def __init_agent_state(self):
+        self.agent_state = AgentState()
+
+    def get_agent_state(self):
+        return self.agent_state
 
     def get_percepts(self, action=None):
         percepts = {}
         if action == "f":  # forward
             newloc = self._get_next_loc(
-                self.agent.location, self.agent.orientation)
+                self.agent_state.location, self.agent_state.orientation)
             if self._will_hit_wall(newloc):
                 # Redundant but just to make sure it's not changed
-                self.agent.set_location(self.agent.location)
-                room = self.grid.item(self.agent.location)
+                self.agent_state.set_location(self.agent_state.location)
+                room = self.grid.item(self.agent_state.location)
                 percepts["stench"] = room.has_stench
                 percepts["breeze"] = room.has_breeze
                 percepts["glitter"] = room.has_glitter
@@ -245,7 +247,7 @@ class Environment:
                 percepts["points"] = -1
             else:
                 # New location
-                self.agent.set_location(newloc)
+                self.agent_state.set_location(newloc)
                 room = self.grid.item(newloc)
                 percepts["stench"] = room.has_stench
                 percepts["breeze"] = room.has_breeze
@@ -256,17 +258,17 @@ class Environment:
 
                 if room.has_pit:
                     percepts["points"] += -1000
-                    self.agent.kill()
+                    self.agent_state.kill()
 
                 if room.has_wumpus and not self.wumpus_dead:
                     percepts["points"] += -1000
-                    self.agent.kill()
+                    self.agent_state.kill()
 
                 room.visited = True
 
         elif action == "l":  # turn left
-            self.agent.turn_left()
-            room = self.grid.item(self.agent.location)
+            self.agent_state.turn_left()
+            room = self.grid.item(self.agent_state.location)
             percepts["stench"] = room.has_stench
             percepts["breeze"] = room.has_breeze
             percepts["glitter"] = room.has_glitter
@@ -275,8 +277,8 @@ class Environment:
             percepts["points"] = -1
 
         elif action == "r":  # turn right
-            self.agent.turn_right()
-            room = self.grid.item(self.agent.location)
+            self.agent_state.turn_right()
+            room = self.grid.item(self.agent_state.location)
             percepts["stench"] = room.has_stench
             percepts["breeze"] = room.has_breeze
             percepts["glitter"] = room.has_glitter
@@ -285,7 +287,7 @@ class Environment:
             percepts["points"] = -1
 
         elif action == "g":  # grab gold
-            room = self.grid.item(self.agent.location)
+            room = self.grid.item(self.agent_state.location)
             percepts["stench"] = room.has_stench
             percepts["breeze"] = room.has_breeze
             percepts["glitter"] = room.has_glitter
@@ -298,7 +300,7 @@ class Environment:
                 room.has_glitter = False
 
         elif action == "c":  # Climb
-            room = self.grid.item(self.agent.location)
+            room = self.grid.item(self.agent_state.location)
             percepts["stench"] = room.has_stench
             percepts["breeze"] = room.has_breeze
             percepts["glitter"] = room.has_glitter
@@ -306,22 +308,22 @@ class Environment:
             percepts["scream"] = self.wumpus_dead
             percepts["points"] = -1
 
-            if self.agent.location == (0, 0):
+            if self.agent_state.location == (0, 0):
                 if self.allowClimbWithoutGold:
-                    self.agent.exit()
+                    self.agent_state.exit()
                 else:
                     if self.gold_grabbed:
                         percepts["points"] = 1000
-                        self.agent.exit()
+                        self.agent_state.exit()
                     else:
                         # Not allowed to exit
                         print("Not allowed to exit without gold..")
                         pass
 
         elif action == "s":  # Shoot
-            room = self.grid.item(self.agent.location)
-            direction = self.agent.orientations[self.agent.orientation]
-            self._shoot_wumpus(self.agent.location, direction)
+            room = self.grid.item(self.agent_state.location)
+            direction = self.agent_state.orientations[self.agent_state.orientation]
+            self._shoot_wumpus(self.agent_state.location, direction)
 
             percepts["stench"] = room.has_stench
             percepts["breeze"] = room.has_breeze
@@ -331,7 +333,7 @@ class Environment:
             percepts["points"] = -10
 
         else:
-            room = self.grid.item(self.agent.location)
+            room = self.grid.item(self.agent_state.location)
             percepts["stench"] = room.has_stench
             percepts["breeze"] = room.has_breeze
             percepts["glitter"] = room.has_glitter
@@ -339,6 +341,6 @@ class Environment:
             percepts["scream"] = self.wumpus_dead
             percepts["points"] = 0
 
-        self.agent.increment_points(percepts["points"])
+        self.agent_state.increment_points(percepts["points"])
 
         return percepts

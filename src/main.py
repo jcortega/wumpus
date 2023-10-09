@@ -6,10 +6,7 @@ from models.episode import Episode
 def main(mode, debug) -> int:
     episode = Episode(debug)
 
-    if mode == 'naive':
-        episode.run_naive_agent()
-    elif mode == 'human':
-        episode.run()
+    episode.run(mode)
 
     return 0
 
