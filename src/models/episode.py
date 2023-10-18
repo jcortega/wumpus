@@ -10,7 +10,7 @@ from .agent.move_planning_agent import MovePlanningAgent
 class Episode:
     def __init__(self, debug):
         self.debug = debug
-        self.environment = Environment(4, 4, False, 0, debug=debug)
+        self.environment = Environment(4, 4, False, 0.2, debug=debug)
         self.agent_state = self.environment.get_agent_state()
 
         self.oldloc = (0, 0)
