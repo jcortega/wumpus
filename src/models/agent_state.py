@@ -9,10 +9,6 @@ class AgentState:
     _exited = False
 
     arrows = 1
-    # has_gold = False
-
-    # def grab_gold(self):
-    #     self.has_gold = True
 
     def set_location(self, location):
         self.location = location

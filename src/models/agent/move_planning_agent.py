@@ -17,7 +17,7 @@ class MovePlanningAgent:
     def __init__(self, choices, read_only_state):
         self.read_only_state = read_only_state
         self.choices = choices
-        self.path = None
+        self.planned_actions = None
 
         self.add_common_edge((0, 0))
 
@@ -34,7 +34,7 @@ class MovePlanningAgent:
             if path == None or len(new_path) < len(path):
                 path = deepcopy(new_path)
 
-        self.path = path
+        return path
 
     def add_common_edge(self, node):
         self.G.add_edge((node[0], node[1], 'right'),
@@ -60,7 +60,48 @@ class MovePlanningAgent:
         (x2, y2, *rest) = b
         return ((x1 - x2) + (y1 - y2))
 
+    def _calculate_next_actions(self, path):
+        next_actions = []
+
+        node1 = path.pop(0)
+        node2 = None
+        while path:
+            node2 = path.pop(0)
+            if node1[2] == node2[2]:
+                next_actions.append('f')
+            elif node1[2] == 'down':
+                if node2[2] == 'left':
+                    next_actions.append('r')
+                elif node2[2] == 'right':
+                    next_actions.append('l')
+            elif node1[2] == 'up':
+                if node2[2] == 'left':
+                    next_actions.append('l')
+                elif node2[2] == 'right':
+                    next_actions.append('r')
+            elif node1[2] == 'left':
+                if node2[2] == 'down':
+                    next_actions.append('l')
+                elif node2[2] == 'up':
+                    next_actions.append('r')
+            elif node1[2] == 'right':
+                if node2[2] == 'down':
+                    next_actions.append('r')
+                elif node2[2] == 'up':
+                    next_actions.append('l')
+            node1 = node2
+        return next_actions
+
     def next_step(self, percepts):
+        if self.planned_actions:
+            next = self.planned_actions.pop(0)
+            return [next]
+
+        if self.has_gold:
+            if self.read_only_state.location == (0, 0):
+                return ['c']
+
+        # Build graph
         if self.read_only_state.location != self.previous_loc:
             opposite_orientation = (self.previous_orientation + 2) % 4
             self.G.add_edge((self.read_only_state.location[0], self.read_only_state.location[1], self.read_only_state.orientations[opposite_orientation]),
@@ -103,22 +144,21 @@ class MovePlanningAgent:
             plt.figure().clear()
             subax1 = plt.subplot()
             nx.draw(self.G, with_labels=True, font_size=8, linewidths=0.5)
-            plt.savefig('foo.png')
-
-        if self.has_gold:
-            if self.read_only_state.location == (0, 0):
-                return 'c'
+            plt.savefig('move_planning_graph.png')
 
         if percepts['glitter']:
             self.has_gold = True
-            print("GRABBED FROM", self.read_only_state.location)
 
-            self.plan_go_back(self.read_only_state.location,
-                              self.read_only_state.orientation)
+            path = self.plan_go_back(self.read_only_state.location,
+                                     self.read_only_state.orientation)
 
-            sys.exit(0)
+            if path[0] != (*self.read_only_state.location, self.read_only_state.orientations[self.read_only_state.orientation]):
+                raise Exception(
+                    "First node of path is not current location and orientation")
 
-            return 'g'
+            self.planned_actions = self._calculate_next_actions(path)
+
+            return ['g']
 
         self.previous_loc = deepcopy(self.read_only_state.location)
         self.previous_orientation = self.read_only_state.orientation
