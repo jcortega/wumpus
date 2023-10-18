@@ -196,6 +196,7 @@ class Environment:
                 # item = self.grid.item((i, j))
                 element = ''
                 if (self.grid.item(i, j).visited) or self._debug:
+                    element += 'v'
                     if self._is_pit((i, j)):
                         element += 'P'
                     if self._is_wumpus((i, j)):
@@ -226,9 +227,6 @@ class Environment:
 
     def __init_agent_state(self):
         self.agent_state = AgentState()
-
-    def get_agent_state(self):
-        return self.agent_state
 
     def get_percepts(self, action=None):
         percepts = {}
@@ -344,3 +342,6 @@ class Environment:
         self.agent_state.increment_points(percepts["points"])
 
         return percepts
+
+    def get_agent_state(self):
+        return self.agent_state

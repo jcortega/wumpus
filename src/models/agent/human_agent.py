@@ -4,7 +4,7 @@ class HumanAgent:
     def __init__(self, choices):
         self.choices = choices
 
-    def next_step(self):
+    def next_step(self, percepts=None):
         while True:
             action = input("Enter your action: ")
             if action not in self.choices:
