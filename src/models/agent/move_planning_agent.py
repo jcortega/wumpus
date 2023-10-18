@@ -6,27 +6,27 @@ import matplotlib.pyplot as plt
 
 
 class MovePlanningAgent:
-    choices = []
-    has_gold = False
-    previous_loc = (0, 0)
-    previous_orientation = 0  # right
-    previous_action = None
+    _choices = []
+    _has_gold = False
+    _previous_loc = (0, 0)
+    _previous_orientation = 0  # right
+    _previous_action = None
+    _planned_actions = None
 
     G = nx.DiGraph()
 
-    def __init__(self, choices, read_only_state):
-        self.read_only_state = read_only_state
-        self.choices = choices
-        self.planned_actions = None
+    def __init__(self, choices, agent_state):
+        self.agent_state = agent_state
+        self._choices = choices
 
-        self.add_common_edge((0, 0))
+        self._add_common_edge((0, 0))
 
-    def plan_go_back(self, loc, orientation):
+    def _plan_move_back(self, loc, orientation):
         from_node = (loc[0], loc[1],
-                     self.read_only_state.orientations[orientation])
+                     self.agent_state.orientations[orientation])
 
         path = None
-        for d in self.read_only_state.orientations:
+        for d in self.agent_state.orientations:
             to_node = (0, 0, d)
             new_path = nx.astar_path(self.G, from_node, to_node,
                                      heuristic=self._manhattan_dist)
@@ -36,7 +36,7 @@ class MovePlanningAgent:
 
         return path
 
-    def add_common_edge(self, node):
+    def _add_common_edge(self, node):
         self.G.add_edge((node[0], node[1], 'right'),
                         (node[0], node[1], 'down'), action='r')
         self.G.add_edge((node[0], node[1], 'down'),
@@ -92,76 +92,77 @@ class MovePlanningAgent:
             node1 = node2
         return next_actions
 
+    def _visualize_graph(self):
+        plt.figure().clear()
+        plt.subplot()
+        nx.draw(self.G, with_labels=True, font_size=8, linewidths=0.5)
+        plt.savefig('move_planning_graph.png')
+
     def next_step(self, percepts):
-        if self.planned_actions:
-            next = self.planned_actions.pop(0)
+        if self._planned_actions:
+            next = self._planned_actions.pop(0)
             return [next]
 
-        if self.has_gold:
-            if self.read_only_state.location == (0, 0):
+        if self._has_gold:
+            if self.agent_state.location == (0, 0):
                 return ['c']
 
         # Build graph
-        if self.read_only_state.location != self.previous_loc:
-            opposite_orientation = (self.previous_orientation + 2) % 4
-            self.G.add_edge((self.read_only_state.location[0], self.read_only_state.location[1], self.read_only_state.orientations[opposite_orientation]),
-                            (self.previous_loc[0], self.previous_loc[1],  self.read_only_state.orientations[opposite_orientation]), action='f')
+        if self.agent_state.location != self._previous_loc:
+            opposite_orientation = (self._previous_orientation + 2) % 4
+            self.G.add_edge((self.agent_state.location[0], self.agent_state.location[1], self.agent_state.orientations[opposite_orientation]),
+                            (self._previous_loc[0], self._previous_loc[1],  self.agent_state.orientations[opposite_orientation]), action='f')
 
             # Top
-            if self.G.has_node((self.read_only_state.location[0]+1, self.read_only_state.location[1], 'down')):
-                self.G.add_edge((self.read_only_state.location[0]+1, self.read_only_state.location[1], 'down'), (self.read_only_state.location[0], self.read_only_state.location[
+            if self.G.has_node((self.agent_state.location[0]+1, self.agent_state.location[1], 'down')):
+                self.G.add_edge((self.agent_state.location[0]+1, self.agent_state.location[1], 'down'), (self.agent_state.location[0], self.agent_state.location[
                                 1], 'down'), action='f')
-            if self.G.has_node((self.read_only_state.location[0]+1, self.read_only_state.location[1], 'up')):
-                self.G.add_edge((self.read_only_state.location[0], self.read_only_state.location[1], 'up'), (
-                    self.read_only_state.location[0]+1, self.read_only_state.location[1], 'up'), action='f')
+            if self.G.has_node((self.agent_state.location[0]+1, self.agent_state.location[1], 'up')):
+                self.G.add_edge((self.agent_state.location[0], self.agent_state.location[1], 'up'), (
+                    self.agent_state.location[0]+1, self.agent_state.location[1], 'up'), action='f')
 
             # bottom
-            if self.G.has_node((self.read_only_state.location[0]-1, self.read_only_state.location[1], 'up')):
-                self.G.add_edge((self.read_only_state.location[0]-1, self.read_only_state.location[1], 'up'), (self.read_only_state.location[0], self.read_only_state.location[
+            if self.G.has_node((self.agent_state.location[0]-1, self.agent_state.location[1], 'up')):
+                self.G.add_edge((self.agent_state.location[0]-1, self.agent_state.location[1], 'up'), (self.agent_state.location[0], self.agent_state.location[
                                 1], 'up'), action='f')
-            if self.G.has_node((self.read_only_state.location[0]-1, self.read_only_state.location[1], 'down')):
-                self.G.add_edge((self.read_only_state.location[0], self.read_only_state.location[1], 'down'), (
-                    self.read_only_state.location[0]-1, self.read_only_state.location[1], 'down'), action='f')
+            if self.G.has_node((self.agent_state.location[0]-1, self.agent_state.location[1], 'down')):
+                self.G.add_edge((self.agent_state.location[0], self.agent_state.location[1], 'down'), (
+                    self.agent_state.location[0]-1, self.agent_state.location[1], 'down'), action='f')
 
             # left
-            if self.G.has_node((self.read_only_state.location[0], self.read_only_state.location[1]-1, 'right')):
-                self.G.add_edge((self.read_only_state.location[0], self.read_only_state.location[1]-1, 'right'), (self.read_only_state.location[0], self.read_only_state.location[
+            if self.G.has_node((self.agent_state.location[0], self.agent_state.location[1]-1, 'right')):
+                self.G.add_edge((self.agent_state.location[0], self.agent_state.location[1]-1, 'right'), (self.agent_state.location[0], self.agent_state.location[
                                 1], 'right'), action='f')
-            if self.G.has_node((self.read_only_state.location[0], self.read_only_state.location[1]-1, 'left')):
-                self.G.add_edge((self.read_only_state.location[0], self.read_only_state.location[1], 'left'), (
-                    self.read_only_state.location[0], self.read_only_state.location[1]-1, 'left'), action='f')
+            if self.G.has_node((self.agent_state.location[0], self.agent_state.location[1]-1, 'left')):
+                self.G.add_edge((self.agent_state.location[0], self.agent_state.location[1], 'left'), (
+                    self.agent_state.location[0], self.agent_state.location[1]-1, 'left'), action='f')
 
             # right
-            if self.G.has_node((self.read_only_state.location[0], self.read_only_state.location[1]+1, 'left')):
-                self.G.add_edge((self.read_only_state.location[0], self.read_only_state.location[1]+1, 'left'), (self.read_only_state.location[0], self.read_only_state.location[
+            if self.G.has_node((self.agent_state.location[0], self.agent_state.location[1]+1, 'left')):
+                self.G.add_edge((self.agent_state.location[0], self.agent_state.location[1]+1, 'left'), (self.agent_state.location[0], self.agent_state.location[
                                 1], 'left'), action='f')
-            if self.G.has_node((self.read_only_state.location[0], self.read_only_state.location[1]+1, 'right')):
-                self.G.add_edge((self.read_only_state.location[0], self.read_only_state.location[1], 'right'), (
-                    self.read_only_state.location[0], self.read_only_state.location[1]+1, 'right'), action='f')
+            if self.G.has_node((self.agent_state.location[0], self.agent_state.location[1]+1, 'right')):
+                self.G.add_edge((self.agent_state.location[0], self.agent_state.location[1], 'right'), (
+                    self.agent_state.location[0], self.agent_state.location[1]+1, 'right'), action='f')
 
-            self.add_common_edge(self.read_only_state.location)
-
-            plt.figure().clear()
-            subax1 = plt.subplot()
-            nx.draw(self.G, with_labels=True, font_size=8, linewidths=0.5)
-            plt.savefig('move_planning_graph.png')
+            self._add_common_edge(self.agent_state.location)
 
         if percepts['glitter']:
-            self.has_gold = True
+            self._has_gold = True
 
-            path = self.plan_go_back(self.read_only_state.location,
-                                     self.read_only_state.orientation)
+            path = self._plan_move_back(self.agent_state.location,
+                                        self.agent_state.orientation)
 
-            if path[0] != (*self.read_only_state.location, self.read_only_state.orientations[self.read_only_state.orientation]):
+            if path[0] != (*self.agent_state.location, self.agent_state.orientations[self.agent_state.orientation]):
                 raise Exception(
                     "First node of path is not current location and orientation")
 
-            self.planned_actions = self._calculate_next_actions(path)
+            self._planned_actions = self._calculate_next_actions(path)
 
             return ['g']
 
-        self.previous_loc = deepcopy(self.read_only_state.location)
-        self.previous_orientation = self.read_only_state.orientation
-        self.previous_action = np.random.choice(self.choices, 1)
+        self._previous_loc = deepcopy(self.agent_state.location)
+        self._previous_orientation = self.agent_state.orientation
+        self._previous_action = np.random.choice(self._choices, 1)
 
-        return self.previous_action
+        return self._previous_action
