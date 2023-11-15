@@ -4,13 +4,18 @@ import numpy as np
 from .environment import Environment
 from .agent.naive_agent import NaiveAgent
 from .agent.human_agent import HumanAgent
+from .agent.ai_assisted_agent import AiAssistedAgent
 from .agent.move_planning_agent import MovePlanningAgent
 
 
 class Episode:
     def __init__(self, debug):
         self.debug = debug
-        self.environment = Environment(4, 4, False, 0.2, debug=debug)
+        self.grid_width = 4
+        self.gridth_height = self.grid_width
+        self.pit_proba = 0.2
+        self.environment = Environment(
+            self.grid_width, self.gridth_height, False, self.pit_proba, debug=debug)
         self.agent_state = self.environment.get_agent_state()
 
         self.oldloc = (0, 0)
@@ -31,6 +36,9 @@ class Episode:
         elif agent_type == 'move_planning':
             choices = ['f', 'l', 'r', 's']  # remove grab and climb
             agent = MovePlanningAgent(choices, self.agent_state)
+        elif agent_type == 'ai_assisted':
+            agent = AiAssistedAgent(
+                list(actions.keys()), self.agent_state, self.grid_width, self.pit_proba)
         else:
             agent = HumanAgent(list(actions.keys()))
 
