@@ -21,6 +21,9 @@ class AiAssistedAgent:
 
     _node_length = None
 
+    _arrow_shot = False
+    _wumpus_dead = False
+
     agent_state = None
 
     def __init__(self, choices, agent_state, grid_size, pit_proba):
@@ -198,28 +201,58 @@ class AiAssistedAgent:
 
     def _set_no_wumpus(self):
         self._wumpus_observations.fill(0)
+        self._wumpus_dead = True
+
+    def _set_no_wumpus_from(self, loc, orientation):
+        """
+        set locations where arrow passed in the orientation direction to 0
+        orientation is orientation index
+        """
+        print(orientation, loc, "orrr")
+        if orientation == 0:  # right
+            for i in range(loc[1], self.grid_size):
+                idx = self._cell_to_index((loc[0], i))
+                self._wumpus_observations[idx] = 0
+        elif orientation == 1:  # bottom
+            for i in range(0, loc[0]):
+                idx = self._cell_to_index((i, loc[1]))
+                self._wumpus_observations[idx] = 0
+        elif orientation == 2:  # left
+            for i in range(0, loc[1]):
+                idx = self._cell_to_index((loc[0], i))
+                self._wumpus_observations[idx] = 0
+        elif orientation == 3:  # up
+            for i in range(loc[0], self.grid_size):
+                idx = self._cell_to_index((i, loc[1]))
+                self._wumpus_observations[idx] = 0
 
     def next_step(self, percepts=None):
         loc = self.agent_state.location
+        orientation = self.agent_state.orientation
         self._set_breeze(loc, percepts["breeze"])
         self._set_stench(loc, percepts["stench"])
 
         agent_dead = self.agent_state.is_dead()
         self._set_safe(loc, agent_dead)
 
-        if percepts["scream"]:
-            self._set_no_wumpus()
-        else:
+        if self._arrow_shot:
+            if percepts["scream"]:
+                self._set_no_wumpus()
+            else:
+                # if arrow shot but no scream, set arrow direction to wumpus=0
+                self._set_no_wumpus_from(loc, orientation)
+
+        if not self._wumpus_dead:
             probable_wumpus_loc = self._get_wumpus_probable_loc()
             print("Wumpus obs: ", self._wumpus_observations)
             print(
                 f"Wumpus loc prob {probable_wumpus_loc[1][0][1]} at {probable_wumpus_loc[0]}")
 
-        print("Pit obs: ", self._pit_observations)
+        # print("Pit obs: ", self._pit_observations)
+        print("Wumpus obs: ", self._wumpus_observations)
 
         # TODO: if risk of death is high on unvisited, move back
         # TODO: if prob of death > .5, find high prob of wumpus, shoot arrow or go home
-        # TODO: if arrow shot but no scream, set arrow direction to wumpus=0
 
         while True:
             adj_cells = self._get_surrounding_cell(
@@ -233,4 +266,6 @@ class AiAssistedAgent:
             if action not in self.choices:
                 print("Invalid action. Try again...")
             else:
+                if action == "s":
+                    self._arrow_shot = True
                 return action
