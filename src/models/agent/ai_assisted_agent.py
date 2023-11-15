@@ -1,5 +1,6 @@
 
 import itertools
+import operator
 import numpy as np
 import pandas as pd
 
@@ -14,7 +15,7 @@ class AiAssistedAgent:
 
     _pit_model = BayesianNetwork()
     _pit_observations = []
-    
+
     _wumpus_model = BayesianNetwork()
     _wumpus_observations = []
 
@@ -142,15 +143,37 @@ class AiAssistedAgent:
 
         return pit_model
 
-    def _get_pit_proba(self, model, cell):
-        X = torch.tensor([self._pit_observations])
+    def _get_proba(self, model, observations, cell):
+        X = torch.tensor([observations])
 
         X_masked = torch.masked.MaskedTensor(X, mask=X >= 0)
         prediction = model.predict_proba(X_masked)
 
-        # Probability of pit in given cell
+        # Probability of X in given cell
         proba = prediction[self._cell_to_index(cell)]
+
         return proba.tolist()[0][1]
+
+    def _get_wumpus_probable_loc(self):
+        """
+        Get the index and probability of most probable wumpus location
+        """
+        X = torch.tensor([self._wumpus_observations])
+
+        X_masked = torch.masked.MaskedTensor(X, mask=X >= 0)
+        prediction = self._wumpus_model.predict_proba(X_masked)
+
+        # [x.tolist()[0][1] for x in prediction]
+        # Probability of wumpus locations
+        # print(list(enumerate(prediction[0:self.grid_size**2])))
+        return max(enumerate(prediction[0:self.grid_size**2]), key=lambda x: x[1][0][1])
+
+    def _get_dying_proba(self, loc):
+        w_proba = self._get_proba(
+            self._wumpus_model, self._wumpus_observations, loc)
+        p_proba = self._get_proba(
+            self._pit_model, self._pit_observations, loc)
+        return w_proba + p_proba - w_proba * p_proba
 
     def _set_breeze(self, loc, value):
         idx = self._cell_to_index(loc)
@@ -173,9 +196,10 @@ class AiAssistedAgent:
         # order of array is [wumpus_probs ... stench_probs] so idx is pit probs
         self._wumpus_observations[idx] = 0.0
 
+    def _set_no_wumpus(self):
+        self._wumpus_observations.fill(0)
 
     def next_step(self, percepts=None):
-        print("From next", percepts)
         loc = self.agent_state.location
         self._set_breeze(loc, percepts["breeze"])
         self._set_stench(loc, percepts["stench"])
@@ -183,15 +207,26 @@ class AiAssistedAgent:
         agent_dead = self.agent_state.is_dead()
         self._set_safe(loc, agent_dead)
 
+        if percepts["scream"]:
+            self._set_no_wumpus()
+        else:
+            probable_wumpus_loc = self._get_wumpus_probable_loc()
+            print("Wumpus obs: ", self._wumpus_observations)
+            print(
+                f"Wumpus loc prob {probable_wumpus_loc[1][0][1]} at {probable_wumpus_loc[0]}")
+
         print("Pit obs: ", self._pit_observations)
-        print("Wumpus obs: ", self._wumpus_observations)
+
+        # TODO: if risk of death is high on unvisited, move back
+        # TODO: if prob of death > .5, find high prob of wumpus, shoot arrow or go home
+        # TODO: if arrow shot but no scream, set arrow direction to wumpus=0
 
         while True:
             adj_cells = self._get_surrounding_cell(
                 loc[0], loc[1], self.grid_size)
             s = ""
             for i in adj_cells:
-                s += f"Adjacent cell {i}: {self._get_pit_proba(self._pit_model, i)}; "
+                s += f"{i} - Dying Prob: {self._get_dying_proba(i)};\n"
 
             print(f"{s}")
             action = input("Enter your action: ")
