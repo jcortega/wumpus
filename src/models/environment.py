@@ -291,11 +291,13 @@ class Environment:
             percepts["glitter"] = room.has_glitter
             percepts["bump"] = False
             percepts["scream"] = self.wumpus_dead
-            percepts["points"] = -1
 
             if percepts["glitter"] and not self.gold_grabbed:
+                percepts["points"] = 1000
                 self.gold_grabbed = True
                 room.has_glitter = False
+            else:
+                percepts["points"] = -1
 
         elif action == "c":  # Climb
             room = self.grid.item(self.agent_state.location)
@@ -311,7 +313,6 @@ class Environment:
                     self.agent_state.exit()
                 else:
                     if self.gold_grabbed:
-                        percepts["points"] = 1000
                         self.agent_state.exit()
                     else:
                         # Not allowed to exit

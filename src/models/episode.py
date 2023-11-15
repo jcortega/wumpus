@@ -15,7 +15,7 @@ class Episode:
         self.gridth_height = self.grid_width
         self.pit_proba = 0.2
         self.environment = Environment(
-            self.grid_width, self.gridth_height, False, self.pit_proba, debug=debug)
+            self.grid_width, self.gridth_height, True, self.pit_proba, debug=debug)
         self.agent_state = self.environment.get_agent_state()
 
         self.oldloc = (0, 0)

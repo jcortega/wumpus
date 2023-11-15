@@ -1,8 +1,9 @@
 
 import itertools
-import operator
 import numpy as np
 import pandas as pd
+import networkx as nx
+import matplotlib.pyplot as plt
 
 from pomegranate.distributions import Categorical
 from pomegranate.distributions import ConditionalCategorical
@@ -23,6 +24,12 @@ class AiAssistedAgent:
 
     _arrow_shot = False
     _wumpus_dead = False
+
+    _path = nx.DiGraph()
+
+    _planned_path = []  # Planned path for going to recommended destination
+
+    _climb = False
 
     agent_state = None
 
@@ -52,6 +59,17 @@ class AiAssistedAgent:
 
         # TODO: need observation for wumpus
 
+    def _visualize_graph(self):
+        plt.figure().clear()
+        plt.subplot()
+        nx.draw(self._path, with_labels=True, font_size=8, linewidths=0.5)
+        plt.savefig('proba_agent_path_graph.png')
+
+    def _manhattan_dist(self, a, b):
+        ((x1, y1), _) = a
+        ((x2, y2), _) = b
+        return ((x1 - x2) + (y1 - y2))
+
     def _cell_to_index(self, cell):
         return cell[0]*self.grid_size + cell[1]
 
@@ -60,17 +78,17 @@ class AiAssistedAgent:
 
         if row + 1 < grid_size:
             # top
-            cells.append((col, row+1))
+            cells.append((row+1, col))
         if col + 1 < grid_size:
             # Right
-            cells.append((col + 1, row))
+            cells.append((row, col + 1))
         if row - 1 >= 0:
             # bottom
-            cells.append((col, row - 1))
+            cells.append((row - 1, col))
 
         if col - 1 >= 0:
             # Left
-            cells.append((col - 1, row))
+            cells.append((row, col - 1))
 
         return cells
 
@@ -100,7 +118,7 @@ class AiAssistedAgent:
         for row in range(self.grid_size):
             for col in range(self.grid_size):
                 adjacent_cells = self._get_surrounding_cell(
-                    row, col, self.grid_size)
+                    col, row, self.grid_size)
                 table = list(itertools.product(
                     [False, True], repeat=len(adjacent_cells)+1))
                 df = pd.DataFrame(table, columns=adjacent_cells + ['stench'])
@@ -129,7 +147,7 @@ class AiAssistedAgent:
         for row in range(self.grid_size):
             for col in range(self.grid_size):
                 adjacent_cells = self._get_surrounding_cell(
-                    row, col, self.grid_size)
+                    col, row, self.grid_size)
                 table = list(itertools.product(
                     [False, True], repeat=len(adjacent_cells)+1))
                 df = pd.DataFrame(table, columns=adjacent_cells + ['breeze'])
@@ -172,11 +190,15 @@ class AiAssistedAgent:
         return max(enumerate(prediction[0:self.grid_size**2]), key=lambda x: x[1][0][1])
 
     def _get_dying_proba(self, loc):
-        w_proba = self._get_proba(
-            self._wumpus_model, self._wumpus_observations, loc)
-        p_proba = self._get_proba(
-            self._pit_model, self._pit_observations, loc)
-        return w_proba + p_proba - w_proba * p_proba
+        if self._wumpus_dead:
+            return self._get_proba(
+                self._pit_model, self._pit_observations, loc)
+        else:
+            w_proba = self._get_proba(
+                self._wumpus_model, self._wumpus_observations, loc)
+            p_proba = self._get_proba(
+                self._pit_model, self._pit_observations, loc)
+            return w_proba + p_proba - w_proba * p_proba
 
     def _set_breeze(self, loc, value):
         idx = self._cell_to_index(loc)
@@ -226,42 +248,169 @@ class AiAssistedAgent:
                 idx = self._cell_to_index((i, loc[1]))
                 self._wumpus_observations[idx] = 0
 
+    def _get_relative_orientation_of(self, cell, from_cell):
+        diff = (cell[0] - from_cell[0], cell[1] - from_cell[1])
+        if diff[0] > 0:
+            return 3  # 'top'
+        elif diff[0] < 0:
+            return 1  # 'bottom'
+        elif diff[1] > 0:
+            return 0  # 'right'
+        elif diff[1] < 0:
+            return 2  # 'left'
+        else:
+            return -1  # self, undefined, do not use
+
+    def _add_node_to_path(self, loc, orientation):
+        adj_cells = self._get_surrounding_cell(loc[1], loc[0], self.grid_size)
+        print("ADdd: ", loc, adj_cells)
+        for i in adj_cells:
+            # Relative orientation of i from loc with proba of dying as weight
+            rel_orientation = self._get_relative_orientation_of(i, loc)
+            # self._path.add_node((i, rel_orientation))
+            self._path.add_edge((loc, rel_orientation),
+                                (i, rel_orientation))
+
+            # Add turn paths with 0 weight (no risk of dying)
+            for j in range(4):
+                self._path.add_edge((loc, j), (loc, (j+1) % 4))
+                self._path.add_edge((loc, j), (loc, (j-1) % 4))
+
+        # For debugging purposes
+        self._visualize_graph()
+
+    def _get_leaf_nodes(self):
+        return [node for node in self._path.nodes()
+                if self._path.in_degree(node) != 0 and self._path.out_degree(node) == 0]
+
+    def _get_least_proba_dying_nodes(self, leaf_nodes):
+        """
+        Given leaf nodes, return nodes with least probability of dying
+        """
+        # NOTE: This could be optimized by calling dying proba prediction for all nodes in one calls
+        dying_proba = [self._get_dying_proba(node[0]) for node in leaf_nodes]
+        least_proba = min(dying_proba)
+        return least_proba, [leaf_nodes[k] for k, v in enumerate(dying_proba)
+                             if least_proba == v]
+
+    def _get_shortest_path(self, from_loc, nodes):
+        min = None
+        min_path = None
+        for node in nodes:
+            path = nx.astar_path(self._path, from_loc, node,
+                                 heuristic=self._manhattan_dist)
+            if min == None or min > len(path):
+                min = len(path)
+                min_path = path
+
+        return min, min_path
+
+    def _get_home_path(self, from_loc):
+        min_path = None
+        min_path_cost = None
+        for i in range(4):
+            path = nx.astar_path(self._path, from_loc, ((0, 0), i),
+                                 heuristic=self._manhattan_dist)
+            if min_path == None or len(path) < min_path_cost:
+                min_path_cost = len(path)
+                min_path = path
+
+        return min_path
+
+    def _get_next_planned_action(self, loc):
+        """
+        get next action base on planned action
+        loc: tuple of (current loc coordinate, current orientation)
+        """
+        next_node = self._planned_path.pop(0)
+        if next_node[0] != loc[0]:
+            # next action is forward if coordinates not the same
+            return 'f'
+
+        # Else turn
+        diff = next_node[1] - loc[1]
+        print("Difff: ", diff)
+        if diff == 1 or diff == -3:
+            # positive diff means turn right
+            return 'r'
+        elif diff == -1 or diff == 3:
+            return 'l'
+
     def next_step(self, percepts=None):
         loc = self.agent_state.location
         orientation = self.agent_state.orientation
+
+        if self._planned_path:
+            action = self._get_next_planned_action((loc, orientation))
+            print(f"Executing planned action.. {action}", self._planned_path)
+            return action
+
+        if self._climb:
+            return ['c']
+
         self._set_breeze(loc, percepts["breeze"])
         self._set_stench(loc, percepts["stench"])
 
         agent_dead = self.agent_state.is_dead()
         self._set_safe(loc, agent_dead)
 
+        self._add_node_to_path(loc, orientation)
+        leaf_nodes = self._get_leaf_nodes()
+        print("Leaf nodes:", leaf_nodes)
         if self._arrow_shot:
             if percepts["scream"]:
                 self._set_no_wumpus()
             else:
                 # if arrow shot but no scream, set arrow direction to wumpus=0
                 self._set_no_wumpus_from(loc, orientation)
+            self._arrow_shot = False  # Reset arrow shot indicator
 
         if not self._wumpus_dead:
             probable_wumpus_loc = self._get_wumpus_probable_loc()
-            print("Wumpus obs: ", self._wumpus_observations)
             print(
                 f"Wumpus loc prob {probable_wumpus_loc[1][0][1]} at {probable_wumpus_loc[0]}")
 
-        # print("Pit obs: ", self._pit_observations)
-        print("Wumpus obs: ", self._wumpus_observations)
+        # Recommendation calculation
+        if percepts["glitter"]:
+            print("Recommendation: grab and go home")
+            # reset planned path if any and go home
+            self._planned_path = self._get_home_path(
+                (loc, orientation))
+            self._planned_path.pop(0)  # Remove current loc from planned path
+            self._climb = True
+            return 'g'
+        elif percepts["stench"] and self.agent_state.arrows >= 1:
+            # TODO: ignore if already grabbed
+            print("**RECO**: find wump and shoot")
+        else:
+            least_dying_proba, min_dying_nodes = self._get_least_proba_dying_nodes(
+                leaf_nodes)
+            print("Minimum", least_dying_proba, min_dying_nodes)
 
-        # TODO: if risk of death is high on unvisited, move back
-        # TODO: if prob of death > .5, find high prob of wumpus, shoot arrow or go home
+            if least_dying_proba > 0.5:
+                print("Recommendation: go home")
+                if loc == (0, 0):
+                    return 'c'
+                else:
+                    self._planned_path = self._get_home_path(
+                        (loc, orientation))
+                    self._climb = True
+            else:
+                # returns cost, path
+                shortest_path = self._get_shortest_path(
+                    (loc, orientation), min_dying_nodes)
+                print(
+                    f"Minimum path steps:{shortest_path[0]}; path: {shortest_path[1]}")
+                print(f"Recommendation: go to {shortest_path[1][-1]}")
+                self._planned_path = shortest_path[1]
+
+            self._planned_path.pop(0)  # Remove current loc from planned path
+            return self._get_next_planned_action((loc, orientation))
+
+        # print("Pit obs: ", self._pit_observations)
+        # print("Wumpus obs: ", self._wumpus_observations)
 
         while True:
-            adj_cells = self._get_surrounding_cell(
-                loc[0], loc[1], self.grid_size)
-            s = ""
-            for i in adj_cells:
-                s += f"{i} - Dying Prob: {self._get_dying_proba(i)};\n"
-
-            print(f"{s}")
             action = input("Enter your action: ")
             if action not in self.choices:
                 print("Invalid action. Try again...")
