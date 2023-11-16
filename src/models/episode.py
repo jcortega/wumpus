@@ -4,7 +4,7 @@ import numpy as np
 from .environment import Environment
 from .agent.naive_agent import NaiveAgent
 from .agent.human_agent import HumanAgent
-from .agent.ai_assisted_agent import AiAssistedAgent
+from .agent.proba_agent import ProbaAgent
 from .agent.move_planning_agent import MovePlanningAgent
 
 
@@ -36,8 +36,8 @@ class Episode:
         elif agent_type == 'move_planning':
             choices = ['f', 'l', 'r', 's']  # remove grab and climb
             agent = MovePlanningAgent(choices, self.agent_state)
-        elif agent_type == 'ai_assisted':
-            agent = AiAssistedAgent(
+        elif agent_type == 'proba_agent':
+            agent = ProbaAgent(
                 list(actions.keys()), self.agent_state, self.grid_width, self.pit_proba)
         else:
             agent = HumanAgent(list(actions.keys()))

@@ -11,7 +11,7 @@ from pomegranate.bayesian_network import BayesianNetwork
 import torch
 
 
-class AiAssistedAgent:
+class ProbaAgent:
     choices = []
 
     _pit_model = BayesianNetwork()
@@ -27,9 +27,7 @@ class AiAssistedAgent:
 
     _path = nx.DiGraph()
 
-    _planned_path = []  # Planned path for going to recommended destination
-
-    _climb = False
+    _planned_action = []  # Planned action for going to recommended destination
 
     agent_state = None
 
@@ -71,7 +69,16 @@ class AiAssistedAgent:
         return ((x1 - x2) + (y1 - y2))
 
     def _cell_to_index(self, cell):
+        """
+        2D coordinate to flat index
+        """
         return cell[0]*self.grid_size + cell[1]
+
+    def _index_to_cell(self, index):
+        """
+        Flat index to 2D coordinate
+        """
+        return (index//self.grid_size, index % self.grid_size)
 
     def _get_surrounding_cell(self, col, row, grid_size):
         cells = []
@@ -250,7 +257,9 @@ class AiAssistedAgent:
 
     def _get_relative_orientation_of(self, cell, from_cell):
         diff = (cell[0] - from_cell[0], cell[1] - from_cell[1])
-        if diff[0] > 0:
+        if cell == from_cell:
+            return -1  # same point
+        elif diff[0] > 0:
             return 3  # 'top'
         elif diff[0] < 0:
             return 1  # 'bottom'
@@ -259,11 +268,11 @@ class AiAssistedAgent:
         elif diff[1] < 0:
             return 2  # 'left'
         else:
-            return -1  # self, undefined, do not use
+            # Probably not line of sight
+            return -2
 
     def _add_node_to_path(self, loc, orientation):
         adj_cells = self._get_surrounding_cell(loc[1], loc[0], self.grid_size)
-        print("ADdd: ", loc, adj_cells)
         for i in adj_cells:
             # Relative orientation of i from loc with proba of dying as weight
             rel_orientation = self._get_relative_orientation_of(i, loc)
@@ -290,8 +299,12 @@ class AiAssistedAgent:
         # NOTE: This could be optimized by calling dying proba prediction for all nodes in one calls
         dying_proba = [self._get_dying_proba(node[0]) for node in leaf_nodes]
         least_proba = min(dying_proba)
-        return least_proba, [leaf_nodes[k] for k, v in enumerate(dying_proba)
-                             if least_proba == v]
+
+        probabilities = (least_proba, [leaf_nodes[k] for k, v in enumerate(dying_proba)
+                                       if least_proba == v])
+        print("Probabilities of dying per node: ", dying_proba)
+        print("Leaf Nodes: ", leaf_nodes)
+        return probabilities
 
     def _get_shortest_path(self, from_loc, nodes):
         min = None
@@ -317,32 +330,36 @@ class AiAssistedAgent:
 
         return min_path
 
-    def _get_next_planned_action(self, loc):
+    def _path_to_actions(self, path, after=[]):
         """
-        get next action base on planned action
-        loc: tuple of (current loc coordinate, current orientation)
+        Convert path, as returned by networkx, to actions
+        Assumes that the first element is the current location
         """
-        next_node = self._planned_path.pop(0)
-        if next_node[0] != loc[0]:
-            # next action is forward if coordinates not the same
-            return 'f'
+        actions = []
+        loc = path.pop(0)  # (coord_loc, orientation)
+        for next_node in path:
+            if next_node[0] != loc[0]:
+                # next action is forward if coordinates not the same
+                actions.append('f')
+            else:
+                # Else turn
+                diff = next_node[1] - loc[1]
+                if diff == 1 or diff == -3:
+                    # positive diff means turn right
+                    actions.append('r')
+                elif diff == -1 or diff == 3:
+                    actions.append('l')
+            loc = next_node
 
-        # Else turn
-        diff = next_node[1] - loc[1]
-        print("Difff: ", diff)
-        if diff == 1 or diff == -3:
-            # positive diff means turn right
-            return 'r'
-        elif diff == -1 or diff == 3:
-            return 'l'
+        return actions + after
 
     def next_step(self, percepts=None):
         loc = self.agent_state.location
         orientation = self.agent_state.orientation
 
-        if self._planned_path:
-            action = self._get_next_planned_action((loc, orientation))
-            print(f"Executing planned action.. {action}", self._planned_path)
+        if self._planned_action:
+            action = self._planned_action.pop(0)
+            print(f"Executing planned action.. {action}")
             return action
 
         if self._climb:
@@ -352,6 +369,7 @@ class AiAssistedAgent:
         self._set_stench(loc, percepts["stench"])
 
         agent_dead = self.agent_state.is_dead()
+        # Safe if agent did not die, probably unnecessary step
         self._set_safe(loc, agent_dead)
 
         self._add_node_to_path(loc, orientation)
@@ -365,23 +383,24 @@ class AiAssistedAgent:
                 self._set_no_wumpus_from(loc, orientation)
             self._arrow_shot = False  # Reset arrow shot indicator
 
-        if not self._wumpus_dead:
-            probable_wumpus_loc = self._get_wumpus_probable_loc()
-            print(
-                f"Wumpus loc prob {probable_wumpus_loc[1][0][1]} at {probable_wumpus_loc[0]}")
-
         # Recommendation calculation
         if percepts["glitter"]:
             print("Recommendation: grab and go home")
             # reset planned path if any and go home
-            self._planned_path = self._get_home_path(
-                (loc, orientation))
-            self._planned_path.pop(0)  # Remove current loc from planned path
-            self._climb = True
+            home_path = self._get_home_path((loc, orientation))
+            print("home_path", home_path)
+            self._planned_action = self._path_to_actions(home_path, ['c'])
             return 'g'
         elif percepts["stench"] and self.agent_state.arrows >= 1:
-            # TODO: ignore if already grabbed
+            # TODO: ignore if already
+            # TODO: find orientation of possible wupmpus and shoot
             print("**RECO**: find wump and shoot")
+            if not self._wumpus_dead:
+                probable_wumpus_loc = self._get_wumpus_probable_loc()
+                print(
+                    f"Wumpus loc prob {probable_wumpus_loc[1][0][1]} at {probable_wumpus_loc[0]}")
+
+            return 's'
         else:
             least_dying_proba, min_dying_nodes = self._get_least_proba_dying_nodes(
                 leaf_nodes)
@@ -392,9 +411,11 @@ class AiAssistedAgent:
                 if loc == (0, 0):
                     return 'c'
                 else:
-                    self._planned_path = self._get_home_path(
-                        (loc, orientation))
-                    self._climb = True
+                    home_path = self._get_home_path((loc, orientation))
+                    print("home_path", home_path)
+                    self._planned_action = self._path_to_actions(
+                        home_path, ['c'])
+                    return self._planned_action.pop(0)
             else:
                 # returns cost, path
                 shortest_path = self._get_shortest_path(
@@ -402,13 +423,12 @@ class AiAssistedAgent:
                 print(
                     f"Minimum path steps:{shortest_path[0]}; path: {shortest_path[1]}")
                 print(f"Recommendation: go to {shortest_path[1][-1]}")
-                self._planned_path = shortest_path[1]
 
-            self._planned_path.pop(0)  # Remove current loc from planned path
-            return self._get_next_planned_action((loc, orientation))
+                self._planned_action = self._path_to_actions(shortest_path[1])
+                return self._planned_action.pop(0)
 
-        # print("Pit obs: ", self._pit_observations)
-        # print("Wumpus obs: ", self._wumpus_observations)
+        print("Pit obs: ", self._pit_observations)
+        print("Wumpus obs: ", self._wumpus_observations)
 
         while True:
             action = input("Enter your action: ")
