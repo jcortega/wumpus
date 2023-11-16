@@ -359,6 +359,10 @@ class ProbaAgent:
         if self._planned_action:
             action = self._planned_action.pop(0)
             print(f"Executing planned action.. {action}")
+
+            if action == 's':
+                self._arrow_shot = True
+
             return action
 
         self._set_breeze(loc, percepts["breeze"])
@@ -373,6 +377,7 @@ class ProbaAgent:
         print("Leaf nodes:", leaf_nodes)
         if self._arrow_shot:
             if percepts["scream"]:
+                print("setting wumpus to dead")
                 self._set_no_wumpus()
             else:
                 # if arrow shot but no scream, set arrow direction to wumpus=0
@@ -387,9 +392,7 @@ class ProbaAgent:
             print("home_path", home_path)
             self._planned_action = self._path_to_actions(home_path, ['c'])
             return 'g'
-        elif percepts["stench"] and self.agent_state.arrows >= 1:
-            # TODO: ignore if already
-            # TODO: find orientation of possible wupmpus and shoot
+        elif percepts["stench"] and self.agent_state.arrows >= 1 and not self._wumpus_dead:
             print("Recommendation: find wump and shoot")
 
             if not self._wumpus_dead:
@@ -402,6 +405,7 @@ class ProbaAgent:
                     f"Wumpus loc prob {wumpus_proba} at {probable_wumpus_loc_cell} direction {probable_wumpus_rel_orientation}")
                 if probable_wumpus_rel_orientation == orientation:
                     # agent already line of sight
+                    self._arrow_shot = True
                     return 's'
                 elif probable_wumpus_rel_orientation > 0:
                     # agent wumpus line sight but different direction
