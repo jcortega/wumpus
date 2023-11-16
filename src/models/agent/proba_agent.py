@@ -237,7 +237,6 @@ class ProbaAgent:
         set locations where arrow passed in the orientation direction to 0
         orientation is orientation index
         """
-        print(orientation, loc, "orrr")
         if orientation == 0:  # right
             for i in range(loc[1], self.grid_size):
                 idx = self._cell_to_index((loc[0], i))
@@ -362,9 +361,6 @@ class ProbaAgent:
             print(f"Executing planned action.. {action}")
             return action
 
-        if self._climb:
-            return ['c']
-
         self._set_breeze(loc, percepts["breeze"])
         self._set_stench(loc, percepts["stench"])
 
@@ -394,47 +390,51 @@ class ProbaAgent:
         elif percepts["stench"] and self.agent_state.arrows >= 1:
             # TODO: ignore if already
             # TODO: find orientation of possible wupmpus and shoot
-            print("**RECO**: find wump and shoot")
+            print("Recommendation: find wump and shoot")
+
             if not self._wumpus_dead:
-                probable_wumpus_loc = self._get_wumpus_probable_loc()
+                probable_wumpus_loc_idx, wumpus_proba = self._get_wumpus_probable_loc()
+                probable_wumpus_loc_cell = self._index_to_cell(
+                    probable_wumpus_loc_idx)
+                probable_wumpus_rel_orientation = self._get_relative_orientation_of(
+                    probable_wumpus_loc_cell, loc)
                 print(
-                    f"Wumpus loc prob {probable_wumpus_loc[1][0][1]} at {probable_wumpus_loc[0]}")
-
-            return 's'
-        else:
-            least_dying_proba, min_dying_nodes = self._get_least_proba_dying_nodes(
-                leaf_nodes)
-            print("Minimum", least_dying_proba, min_dying_nodes)
-
-            if least_dying_proba > 0.5:
-                print("Recommendation: go home")
-                if loc == (0, 0):
-                    return 'c'
-                else:
-                    home_path = self._get_home_path((loc, orientation))
-                    print("home_path", home_path)
+                    f"Wumpus loc prob {wumpus_proba} at {probable_wumpus_loc_cell} direction {probable_wumpus_rel_orientation}")
+                if probable_wumpus_rel_orientation == orientation:
+                    # agent already line of sight
+                    return 's'
+                elif probable_wumpus_rel_orientation > 0:
+                    # agent wumpus line sight but different direction
+                    rotation_path = self._get_shortest_path(
+                        (loc, orientation), (probable_wumpus_loc_cell, probable_wumpus_rel_orientation))
                     self._planned_action = self._path_to_actions(
-                        home_path, ['c'])
+                        rotation_path, ['s'])
                     return self._planned_action.pop(0)
-            else:
-                # returns cost, path
-                shortest_path = self._get_shortest_path(
-                    (loc, orientation), min_dying_nodes)
-                print(
-                    f"Minimum path steps:{shortest_path[0]}; path: {shortest_path[1]}")
-                print(f"Recommendation: go to {shortest_path[1][-1]}")
 
-                self._planned_action = self._path_to_actions(shortest_path[1])
+                # Not line of sight, dont waste arrow and move on
+
+        # If no stench or glitter, find cell least probability of dying
+        least_dying_proba, min_dying_nodes = self._get_least_proba_dying_nodes(
+            leaf_nodes)
+        print("Minimum", least_dying_proba, min_dying_nodes)
+
+        if least_dying_proba > 0.5:
+            print("Recommendation: go home")
+            if loc == (0, 0):
+                return 'c'
+            else:
+                home_path = self._get_home_path((loc, orientation))
+                print("home_path", home_path)
+                self._planned_action = self._path_to_actions(
+                    home_path, ['c'])
                 return self._planned_action.pop(0)
+        else:
+            # returns cost, path
+            shortest_path = self._get_shortest_path(
+                (loc, orientation), min_dying_nodes)
+            print(
+                f"Minimum path steps:{shortest_path[0]}; path: {shortest_path[1]}")
+            print(f"Recommendation: go to {shortest_path[1][-1]}")
 
-        print("Pit obs: ", self._pit_observations)
-        print("Wumpus obs: ", self._wumpus_observations)
-
-        while True:
-            action = input("Enter your action: ")
-            if action not in self.choices:
-                print("Invalid action. Try again...")
-            else:
-                if action == "s":
-                    self._arrow_shot = True
-                return action
+            self._planned_action = self._path_to_actions(shortest_path[1])
+            return self._planned_action.pop(0)
