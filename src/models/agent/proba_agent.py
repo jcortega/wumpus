@@ -210,7 +210,9 @@ class ProbaAgent:
             return self._get_proba(
                 self._pit_model, self._pit_observations, loc)
         else:
-            print("Calculating proba with wumpus..")
+            print("Calculating proba with wumpus..",
+                  self._wumpus_observations)
+
             w_proba = self._get_proba(
                 self._wumpus_model, self._wumpus_observations, loc)
             p_proba = self._get_proba(
