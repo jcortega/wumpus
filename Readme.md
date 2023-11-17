@@ -2,16 +2,24 @@ This is a Wumpus World game simulator.
 
 ## To run the simulator using the Move Planning Agent, use the command below:
 
-Install required libraries.
+Install required libraries in your own venv
 
 ```
+python -m venv .env
+source .env/bin/activate
 pip install networkx matplotlib
 
 ```
 
+## To run simulator, run main.py with below format
+
 ```
-python src/main.py move_planning
+python src/main.py <agent_type>
 ```
+
+`<agent_type>` could be `human`, `move_planning`, `naive` or `proba_agent`.
+
+More examples below.
 
 ## To run the simulator using the Naive Agent, use the command below:
 

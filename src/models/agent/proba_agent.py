@@ -32,9 +32,17 @@ class ProbaAgent:
     agent_state = None
 
     def __init__(self, choices, agent_state, grid_size, pit_proba):
+        # Clear graph to make sure no nodes in graph
+        # Found a bug in networkx that initializes graph with several nodes already in it
+        self._path.clear()
+
+        print("Initial path nodes on initialization: ", self._path.nodes())
+
         self.choices = choices
         self.grid_size = grid_size
         self.agent_state = agent_state
+        print(
+            f"Initial Arrows: {self.agent_state.arrows} WumpDead: {self._wumpus_dead}")
 
         print("Initializing models...")
         self._pit_model = self._init_pit_model(pit_proba)
@@ -198,13 +206,16 @@ class ProbaAgent:
 
     def _get_dying_proba(self, loc):
         if self._wumpus_dead:
+            print("Calculating proba without wumpus..")
             return self._get_proba(
                 self._pit_model, self._pit_observations, loc)
         else:
+            print("Calculating proba with wumpus..")
             w_proba = self._get_proba(
                 self._wumpus_model, self._wumpus_observations, loc)
             p_proba = self._get_proba(
                 self._pit_model, self._pit_observations, loc)
+            print(f"{w_proba} {p_proba}  {w_proba * p_proba}")
             return w_proba + p_proba - w_proba * p_proba
 
     def _set_breeze(self, loc, value):
@@ -272,6 +283,10 @@ class ProbaAgent:
 
     def _add_node_to_path(self, loc, orientation):
         adj_cells = self._get_surrounding_cell(loc[1], loc[0], self.grid_size)
+        print("Add node to path call():")
+        print("---", adj_cells)
+        print("---", loc)
+
         for i in adj_cells:
             # Relative orientation of i from loc with proba of dying as weight
             rel_orientation = self._get_relative_orientation_of(i, loc)
@@ -279,15 +294,16 @@ class ProbaAgent:
             self._path.add_edge((loc, rel_orientation),
                                 (i, rel_orientation))
 
-            # Add turn paths with 0 weight (no risk of dying)
+            # Add turn paths (no risk of dying)
             for j in range(4):
                 self._path.add_edge((loc, j), (loc, (j+1) % 4))
                 self._path.add_edge((loc, j), (loc, (j-1) % 4))
 
         # For debugging purposes
-        self._visualize_graph()
+        # self._visualize_graph()
 
     def _get_leaf_nodes(self):
+        print("Path nodes: ", self._path.nodes())
         return [node for node in self._path.nodes()
                 if self._path.in_degree(node) != 0 and self._path.out_degree(node) == 0]
 
@@ -309,13 +325,15 @@ class ProbaAgent:
         min = None
         min_path = None
         for node in nodes:
-            path = nx.astar_path(self._path, from_loc, node,
-                                 heuristic=self._manhattan_dist)
+            path = self._get_shortest_path_to_node(from_loc, node)
             if min == None or min > len(path):
                 min = len(path)
                 min_path = path
 
         return min, min_path
+
+    def _get_shortest_path_to_node(self, from_loc, node):
+        return nx.astar_path(self._path, from_loc, node, heuristic=self._manhattan_dist)
 
     def _get_home_path(self, from_loc):
         min_path = None
@@ -356,6 +374,7 @@ class ProbaAgent:
         loc = self.agent_state.location
         orientation = self.agent_state.orientation
 
+        # Execute planned action before calculating new actions
         if self._planned_action:
             action = self._planned_action.pop(0)
             print(f"Executing planned action.. {action}")
@@ -365,11 +384,13 @@ class ProbaAgent:
 
             return action
 
+        # Set breeze or stench if found
         self._set_breeze(loc, percepts["breeze"])
         self._set_stench(loc, percepts["stench"])
 
         agent_dead = self.agent_state.is_dead()
-        # Safe if agent did not die, probably unnecessary step
+
+        # Set node to be safe if agent did not die, probably unnecessary step
         self._set_safe(loc, agent_dead)
 
         self._add_node_to_path(loc, orientation)
@@ -393,8 +414,9 @@ class ProbaAgent:
             self._planned_action = self._path_to_actions(home_path, ['c'])
             return 'g'
         elif percepts["stench"] and self.agent_state.arrows >= 1 and not self._wumpus_dead:
+            # Constraint (c) give up without attempting to kill the Wumpus if it is likely to be beneficial
+            # Constraint (d) waste its arrow unnecessarily
             print("Recommendation: find wump and shoot")
-
             if not self._wumpus_dead:
                 probable_wumpus_loc_idx, wumpus_proba = self._get_wumpus_probable_loc()
                 probable_wumpus_loc_cell = self._index_to_cell(
@@ -404,24 +426,28 @@ class ProbaAgent:
                 print(
                     f"Wumpus loc prob {wumpus_proba} at {probable_wumpus_loc_cell} direction {probable_wumpus_rel_orientation}")
                 if probable_wumpus_rel_orientation == orientation:
-                    # agent already line of sight
+                    # agent already line of sight, shoot now
                     self._arrow_shot = True
                     return 's'
                 elif probable_wumpus_rel_orientation > 0:
-                    # agent wumpus line sight but different direction
-                    rotation_path = self._get_shortest_path(
-                        (loc, orientation), (probable_wumpus_loc_cell, probable_wumpus_rel_orientation))
+                    # wumpus is in line of sight but different direction
+                    # just make some turns
+                    rotation_path = self._get_shortest_path_to_node(
+                        (loc, orientation), (loc, probable_wumpus_rel_orientation))
                     self._planned_action = self._path_to_actions(
                         rotation_path, ['s'])
                     return self._planned_action.pop(0)
 
-                # Not line of sight, dont waste arrow and move on
+                # Else, not line of sight, dont waste arrow and move on
 
+        # Constraint (a) unnecessarily visit locations it’s already been
         # If no stench or glitter, find cell least probability of dying
         least_dying_proba, min_dying_nodes = self._get_least_proba_dying_nodes(
             leaf_nodes)
         print("Minimum", least_dying_proba, min_dying_nodes)
 
+        # Constraint (b) take unnecessary risks
+        # Constraint (e) to give up unless the next move is more than 50%
         if least_dying_proba > 0.5:
             print("Recommendation: go home")
             if loc == (0, 0):

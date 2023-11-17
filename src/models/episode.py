@@ -56,12 +56,12 @@ class Episode:
                 self.environment.print_grid()
                 print(
                     f"Agent died with {self.agent_state.points()} points")
-                return
+                return self.agent_state.points()
 
             if self.agent_state.exited():
                 self.environment.print_grid()
                 print(f"Agent exited with {self.agent_state.points()} points.")
-                return True
+                return self.agent_state.points()
 
             action = agent.next_step(percepts)[0]
             print(f"{actions[action[0]]} ...")
