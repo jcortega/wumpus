@@ -6,7 +6,9 @@ from models.episode import Episode
 def main(mode, debug) -> int:
     episode = Episode(debug)
 
-    episode.run(mode)
+    score = episode.run(mode)
+
+    print("Total score for this episode: ", score)
 
     return 0
 

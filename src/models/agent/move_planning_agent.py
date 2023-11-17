@@ -16,6 +16,10 @@ class MovePlanningAgent:
     G = nx.DiGraph()
 
     def __init__(self, choices, agent_state):
+        # Clear graph to make sure no nodes in graph
+        # Found a bug in networkx that initializes graph with several nodes already in it
+        self.G.clear()
+
         self.agent_state = agent_state
         self._choices = choices
 
